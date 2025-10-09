@@ -33,7 +33,7 @@ if exist "%TOOLS_DIR%kernelsu.ko" (
     echo [+] kernelsu.ko is present.
 ) else (
     echo [!] 'kernelsu.ko' not found. Attempting to download...
-    curl -L "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/android15-6.6_kernelsu.ko" -o "%TOOLS_DIR%kernelsu.ko"
+    curl -L "https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v1.1.1/android14-6.1_kernelsu.ko" -o "%TOOLS_DIR%kernelsu.ko"
     if exist "%TOOLS_DIR%kernelsu.ko" (echo [+] Download successful.) else (echo [!] Download failed. Aborting. & pause & exit /b)
 )
 echo.
