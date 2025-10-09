@@ -113,7 +113,7 @@ if errorlevel 1 (
 )
 echo.
 
-if defined PROCESS_INIT_BOOT if exist init_boot.root.img (
+if defined PROCESS_INIT_BOOT (
     echo Extracting info from init_boot.bak.img...
     "%PYTHON%" "%PY_AVBTOOL%" info_image --image init_boot.bak.img > init_info.tmp
     if errorlevel 1 (
@@ -197,7 +197,7 @@ echo.
 
 echo Re-signing vbmeta.img by reading from backup...
 
-if defined PROCESS_INIT_BOOT if exist init_boot.root.img (
+if defined PROCESS_INIT_BOOT (
     "%PYTHON%" "%PY_AVBTOOL%" make_vbmeta_image ^
         --output vbmeta.img ^
         --key "%~dp0!KEY_FILE!" ^
@@ -225,7 +225,7 @@ echo Renaming final images...
 if exist vendor_boot_prc.img (
     ren vendor_boot_prc.img vendor_boot.img
 )
-if defined PROCESS_INIT_BOOT if exist init_boot.root.img (
+if defined PROCESS_INIT_BOOT (
     ren init_boot.root.img init_boot.img
 )
 echo.
@@ -234,7 +234,7 @@ echo Moving final images to 'output' folder...
 if not exist output mkdir output
 move vendor_boot.img output
 move vbmeta.img output
-if defined PROCESS_INIT_BOOT if exist init_boot.img move init_boot.img output
+if defined PROCESS_INIT_BOOT move init_boot.img output
 echo.
 
 echo Moving backup files to 'backup' folder...
