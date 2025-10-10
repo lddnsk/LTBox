@@ -1,4 +1,4 @@
-# Android vendor_boot Patcher and vbmeta Remaker
+# Android BOOT & VBMETA Patcher
 
 ## ⚠️ Disclaimer
 
@@ -8,30 +8,29 @@ Modifying your device's boot images carries significant risks, including but not
 
 **You are solely responsible for any consequences. Use at your own absolute risk.**
 
-This set of scripts automates the process of region code conversion for `vendor_boot.img` and remaking the corresponding `vbmeta.img`. It also provides an option to patch the `boot.img` with **KernelSU Next** to enable root.
+This set of scripts automates two main tasks:
+1.  Converting the region code for `vendor_boot.img` and remaking the corresponding `vbmeta.img`.
+2.  Enabling root by replacing the kernel in `boot.img` with [patched one](https://github.com/WildKernels/GKI_KernelSU_SUSFS).
 
 ## Prerequisites
 
-Before you begin, you must provide the following files from your device's stock firmware:
+Before you begin, place the required files from your device's stock firmware into the main directory:
 
-* `vbmeta.img`
-* `vendor_boot.img`
-* `boot.img` (if you want to root)
-
-Place these files in the main directory alongside the scripts. All other dependencies (like Python, `magiskboot`, and signing keys) will be downloaded automatically.
+* For `vendor_boot`/`vbmeta` conversion: `vendor_boot.img` and `vbmeta.img`.
+* For rooting: `boot.img`.
 
 ## How to Use
 
-1.  **Place Images:** Put your `vendor_boot.img` and `vbmeta.img` (and `boot.img` if rooting) files into the root folder.
-2.  **Install Dependencies:** Run the `install.bat` script first. This will download and set up all the necessary tools and keys.
+1.  **Place Images:** Put the necessary `.img` files into the root folder.
+2.  **Install Dependencies:** Run `install.bat` once to download and set up all required tools.
 3.  **Run the Script:**
-    * To convert `vendor_boot` only, run `convert.bat`.
-    * To **add root** during the process, run `convert_with_root.bat`.
-4.  **Flash the Images:** Once the script is finished, new `.img` files will be ready in the `output` folder. You can now flash these to your device using `fastboot`.
+    * To convert `vendor_boot` and remake `vbmeta`, run **`convert.bat`**. The results will be in the `output` folder.
+    * To enable root, run **`only_root.bat`**. The result will be in the `output_root` folder.
+4.  **Flash the Images:** After a script finishes, flash the new `.img` file(s) from the appropriate output folder to your device using `fastboot`.
 
 ## Script Descriptions
 
-* **`info.bat`**: Drag & drop `.img` file(s) to see AVB information.
-* **`install.bat`**: Checks for required tools and keys, and downloads them if they are missing.
-* **`convert.bat`**: The main script. It handles the region code conversion and remakes the `vbmeta.img` **without** adding root.
-* **`convert_with_root.bat`**: An alternative to the main script. It first patches the `boot.img` with **KernelSU Next** and then runs the conversion and remaking process.
+* **`install.bat`**: Downloads and sets up all necessary tools (Python, avbtool, etc.).
+* **`convert.bat`**: Handles the `vendor_boot` region code conversion and remakes `vbmeta.img`.
+* **`only_root.bat`**: Enables root by replacing the kernel in `boot.img` with a WKSU & SUSFS patched version.
+* **`info.bat`**: Drag & drop `.img` file(s) or folder(s) onto this script to see AVB information.
