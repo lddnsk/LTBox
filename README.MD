@@ -1,4 +1,4 @@
-# Android vendor_boot Patcher and vbmeta Resigner
+# Android vendor_boot Patcher and vbmeta Remaker
 
 ## ⚠️ Disclaimer
 
@@ -8,7 +8,7 @@ Modifying your device's boot images carries significant risks, including but not
 
 **You are solely responsible for any consequences. Use at your own absolute risk.**
 
-This set of scripts automates the process of region code conversion for `vendor_boot.img` and re-signing the corresponding `vbmeta.img`. It also provides an option to patch the `boot.img` with **KernelSU Next** to enable root.
+This set of scripts automates the process of region code conversion for `vendor_boot.img` and remaking the corresponding `vbmeta.img`. It also provides an option to patch the `boot.img` with **KernelSU Next** to enable root.
 
 ## Prerequisites
 
@@ -18,20 +18,20 @@ Before you begin, you must provide the following files from your device's stock 
 * `vendor_boot.img`
 * `boot.img` (if you want to root)
 
-Place these two files in the main directory alongside the scripts. All other dependencies (like Python, `magiskboot`, and signing keys) will be downloaded automatically.
+Place these files in the main directory alongside the scripts. All other dependencies (like Python, `magiskboot`, and signing keys) will be downloaded automatically.
 
 ## How to Use
 
-1.  **Place Images:** Put your `vendor_boot.img` and `vbmeta.img` files into the root folder.
+1.  **Place Images:** Put your `vendor_boot.img` and `vbmeta.img` (and `boot.img` if rooting) files into the root folder.
 2.  **Install Dependencies:** Run the `install.bat` script first. This will download and set up all the necessary tools and keys.
 3.  **Run the Script:**
-    * Simply run `convert.bat`.
-    * If you want to **add root** during the process, run `convert_with_root.bat` instead.
-4.  **Flash the Images:** Once the script is finished, new img files will be ready in the output folder. You can now flash these to your device using `fastboot`.
+    * To convert `vendor_boot` only, run `convert.bat`.
+    * To **add root** during the process, run `convert_with_root.bat`.
+4.  **Flash the Images:** Once the script is finished, new `.img` files will be ready in the `output` folder. You can now flash these to your device using `fastboot`.
 
 ## Script Descriptions
 
-* **`info.bat`**: Drag & drop img file(s) to see information
+* **`info.bat`**: Drag & drop `.img` file(s) to see AVB information.
 * **`install.bat`**: Checks for required tools and keys, and downloads them if they are missing.
-* **`convert.bat`**: The main script. It handles the region code conversion and re-signs the `vbmeta.img` **without** adding root.
-* **`convert_with_root.bat`**: An alternative to the main script. It first patches the `boot.img` with **KernelSU Next** and then runs the conversion and re-signing process.
+* **`convert.bat`**: The main script. It handles the region code conversion and remakes the `vbmeta.img` **without** adding root.
+* **`convert_with_root.bat`**: An alternative to the main script. It first patches the `boot.img` with **KernelSU Next** and then runs the conversion and remaking process.
