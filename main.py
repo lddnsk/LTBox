@@ -8,6 +8,7 @@ import zipfile
 import platform
 import re
 from pathlib import Path
+from datetime import datetime
 
 BASE_DIR = Path(__file__).parent.resolve()
 TOOLS_DIR = BASE_DIR / "tools"
@@ -386,27 +387,58 @@ def convert_images(with_root=False):
     print("=" * 61)
 
 def show_image_info(files):
-    print("\n" + "=" * 42)
-    print("  Sorted and Processing Images...")
-    print("=" * 42 + "\n")
+    output_lines = []
+
+    def add_to_output(text):
+        print(text)
+        output_lines.append(text)
+
+    add_to_output("\n" + "=" * 42)
+    add_to_output("  Sorted and Processing Images...")
+    add_to_output("=" * 42 + "\n")
 
     sorted_files = sorted(files)
 
     for f in sorted_files:
         file_path = Path(f).resolve()
+        
+        add_to_output(f"Processing file: {file_path.name}")
+        add_to_output("---------------------------------")
+
         if not file_path.exists():
-            print(f"File not found: {file_path}")
+            add_to_output(f"File not found: {file_path}")
+            add_to_output("---------------------------------\n")
             continue
 
-        print(f"Processing file: {file_path.name}")
-        print("---------------------------------")
         try:
-            run_command([
-                str(PYTHON_EXE), str(AVBTOOL_PY), "info_image", "--image", str(file_path)
-            ])
-        except subprocess.CalledProcessError:
-             print(f"Failed to get info from {file_path.name}")
-        print("---------------------------------\n")
+            env = os.environ.copy()
+            env['PATH'] = str(TOOLS_DIR) + os.pathsep + env['PATH']
+            process = subprocess.run(
+                [str(PYTHON_EXE), str(AVBTOOL_PY), "info_image", "--image", str(file_path)],
+                capture_output=True, text=True, encoding='utf-8', errors='ignore', env=env, check=True
+            )
+            
+            if process.stdout:
+                add_to_output(process.stdout.strip())
+            if process.stderr:
+                print(process.stderr.strip(), file=sys.stderr)
+
+        except subprocess.CalledProcessError as e:
+            error_message = f"Failed to get info from {file_path.name}"
+            add_to_output(error_message)
+            if e.stderr:
+                print(e.stderr.strip(), file=sys.stderr)
+        
+        add_to_output("---------------------------------\n")
+    
+    try:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        output_filename = BASE_DIR / f"{timestamp}.txt"
+        with open(output_filename, "w", encoding="utf-8") as f:
+            f.write("\n".join(output_lines))
+        print(f"[*] Image info saved to: {output_filename}")
+    except IOError as e:
+        print(f"[!] Error saving info to file: {e}", file=sys.stderr)
 
 def main():
     parser = argparse.ArgumentParser(description="Android vendor_boot Patcher and vbmeta Resigner.")
