@@ -17,6 +17,7 @@ TOOLS_DIR = BASE_DIR / "tools"
 PYTHON_DIR = BASE_DIR / "python3"
 AVB_DIR = TOOLS_DIR / "avb"
 OUTPUT_DIR = BASE_DIR / "output"
+OUTPUT_ROOT_DIR = BASE_DIR / "output_root"
 BACKUP_DIR = BASE_DIR / "backup"
 WORK_DIR = BASE_DIR / "patch_work"
 
@@ -154,10 +155,12 @@ def extract_image_avb_info(image_path):
 
 # --- Core Functions ---
 def patch_boot_with_root():
-    """Patches boot.img with KernelSU."""
+    """Patches boot.img with KernelSU and returns the path to the patched image."""
     print("--- Starting boot.img patching process ---")
     magiskboot_exe = get_platform_executable("magiskboot")
     fetch_exe = get_platform_executable("fetch")
+    
+    patched_boot_path = BASE_DIR / "boot.root.img"
 
     if not magiskboot_exe.exists():
         print(f"[!] '{magiskboot_exe.name}' not found. Attempting to download...")
@@ -252,7 +255,7 @@ def patch_boot_with_root():
         if not (WORK_DIR / "new-boot.img").exists():
             print("[!] Failed to repack the boot image.")
             sys.exit(1)
-        shutil.move("new-boot.img", BASE_DIR / "boot.root.img")
+        shutil.move("new-boot.img", patched_boot_path)
         print("[+] Repack successful.")
 
         print("\n[7/8] Downloading KernelSU Manager APKs...")
@@ -274,18 +277,13 @@ def patch_boot_with_root():
             boot_img.unlink()
         print("\n--- Cleaning up ---")
 
-    print("\n" + "=" * 61)
-    print("  SUCCESS!")
-    print(f"  Patched image has been saved as: {BASE_DIR / 'boot.root.img'}")
-    print("=" * 61)
-    print("\n--- Handing over to convert process ---\n")
+    if patched_boot_path.exists():
+        return patched_boot_path
+    return None
 
-def convert_images(with_root=False):
-    """Converts images and remakes vbmeta."""
+def convert_images():
+    """Converts vendor_boot and remakes vbmeta, without rooting."""
     check_dependencies()
-
-    if with_root:
-        patch_boot_with_root()
 
     print("[*] Cleaning up old folders...")
     if OUTPUT_DIR.exists():
@@ -356,9 +354,6 @@ def convert_images(with_root=False):
     vbmeta_pubkey = vbmeta_info.get('pubkey_sha1')
     key_file = key_map.get(vbmeta_pubkey)
 
-    if with_root:
-        process_boot_image(key_map)
-
     print(f"--- Remaking vbmeta.img ---")
     print("[*] Verifying vbmeta key...")
     if not key_file:
@@ -380,41 +375,9 @@ def convert_images(with_root=False):
     run_command(remake_cmd)
     print()
 
-    finalize_images(with_root)
+    finalize_images()
 
-def process_boot_image(key_map):
-    """Processes the boot image if rooting is enabled."""
-    print("--- Processing boot image ---")
-    boot_bak_img = BASE_DIR / "boot.bak.img"
-    boot_info = extract_image_avb_info(boot_bak_img)
-    
-    for key in ['partition_size', 'name', 'rollback', 'salt', 'algorithm', 'pubkey_sha1']:
-        if key not in boot_info:
-            raise KeyError(f"Could not find '{key}' in '{boot_bak_img.name}' AVB info.")
-            
-    boot_pubkey = boot_info.get('pubkey_sha1')
-    key_file = key_map.get(boot_pubkey)
-    
-    if not key_file:
-        print(f"[!] Public key SHA1 '{boot_pubkey}' from boot.img did not match known keys. Cannot add footer.")
-        sys.exit(1)
-
-    print(f"\n[*] Adding new hash footer to 'boot.root.img' using key {key_file.name}...")
-    boot_root_img = BASE_DIR / "boot.root.img"
-    add_footer_cmd = [
-        str(PYTHON_EXE), str(AVBTOOL_PY), "add_hash_footer",
-        "--image", str(boot_root_img), 
-        "--key", str(key_file),
-        "--algorithm", boot_info['algorithm'], 
-        "--partition_size", boot_info['partition_size'],
-        "--partition_name", boot_info['name'], 
-        "--rollback_index", boot_info['rollback'],
-        "--salt", boot_info['salt'], 
-        *boot_info.get('props_args', [])
-    ]
-    run_command(add_footer_cmd)
-
-def finalize_images(with_root):
+def finalize_images():
     """Finalizes the process by moving images to their final destinations."""
     print("--- Finalizing ---")
     print("[*] Renaming final images...")
@@ -422,10 +385,6 @@ def finalize_images(with_root):
     shutil.move(BASE_DIR / "vendor_boot_prc.img", final_vendor_boot)
 
     final_images = [final_vendor_boot, BASE_DIR / "vbmeta.img"]
-    if with_root:
-        final_boot = BASE_DIR / "boot.img"
-        shutil.move(BASE_DIR / "boot.root.img", final_boot)
-        final_images.append(final_boot)
 
     print("\n[*] Moving final images to 'output' folder...")
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -442,6 +401,78 @@ def finalize_images(with_root):
     print("  SUCCESS!")
     print("  Final images have been saved to the 'output' folder.")
     print("=" * 61)
+    
+def root_boot_only():
+    """Patches boot.img with KernelSU and places it in the output_root folder."""
+    print("[*] Cleaning up old output_root folder...")
+    if OUTPUT_ROOT_DIR.exists():
+        shutil.rmtree(OUTPUT_ROOT_DIR)
+    OUTPUT_ROOT_DIR.mkdir(exist_ok=True)
+    print()
+    
+    check_dependencies()
+
+    patched_boot_path = patch_boot_with_root()
+
+    if patched_boot_path and patched_boot_path.exists():
+        print("\n--- Finalizing ---")
+        final_boot_img = OUTPUT_ROOT_DIR / "boot.img"
+        
+        print("[*] Adding hash footer to the patched boot image...")
+        key_map = {
+            "2597c218aae470a130f61162feaae70afd97f011": AVB_DIR / "testkey_rsa4096.pem",
+            "cdbb77177f731920bbe0a0f94f84d9038ae0617d": AVB_DIR / "testkey_rsa2048.pem"
+        }
+        process_boot_image(key_map, patched_boot_path)
+
+        print(f"\n[*] Moving final image to '{OUTPUT_ROOT_DIR.name}' folder...")
+        shutil.move(patched_boot_path, final_boot_img)
+
+        print("\n[*] Moving backup file to 'backup' folder...")
+        BACKUP_DIR.mkdir(exist_ok=True)
+        for bak_file in BASE_DIR.glob("boot.bak.img"):
+            shutil.move(bak_file, BACKUP_DIR / bak_file.name)
+        print()
+
+        print("=" * 61)
+        print("  SUCCESS!")
+        print(f"  Patched boot.img has been saved to the '{OUTPUT_ROOT_DIR.name}' folder.")
+        print("=" * 61)
+    else:
+        print("[!] Patched boot image was not created. An error occurred during the process.", file=sys.stderr)
+
+
+def process_boot_image(key_map, image_to_process):
+    """Adds a hash footer to a boot image."""
+    print("--- Processing boot image ---")
+    boot_bak_img = BASE_DIR / "boot.bak.img"
+    boot_info = extract_image_avb_info(boot_bak_img)
+    
+    for key in ['partition_size', 'name', 'rollback', 'salt', 'algorithm', 'pubkey_sha1']:
+        if key not in boot_info:
+            raise KeyError(f"Could not find '{key}' in '{boot_bak_img.name}' AVB info.")
+            
+    boot_pubkey = boot_info.get('pubkey_sha1')
+    key_file = key_map.get(boot_pubkey)
+    
+    if not key_file:
+        print(f"[!] Public key SHA1 '{boot_pubkey}' from boot.img did not match known keys. Cannot add footer.")
+        sys.exit(1)
+
+    print(f"\n[*] Adding new hash footer to '{image_to_process.name}' using key {key_file.name}...")
+    add_footer_cmd = [
+        str(PYTHON_EXE), str(AVBTOOL_PY), "add_hash_footer",
+        "--image", str(image_to_process), 
+        "--key", str(key_file),
+        "--algorithm", boot_info['algorithm'], 
+        "--partition_size", boot_info['partition_size'],
+        "--partition_name", boot_info['name'], 
+        "--rollback_index", boot_info['rollback'],
+        "--salt", boot_info['salt'], 
+        *boot_info.get('props_args', [])
+    ]
+    run_command(add_footer_cmd)
+
 
 def show_image_info(files):
     """Displays information about image files, searching directories for .img files."""
@@ -500,20 +531,21 @@ def show_image_info(files):
 
 def main():
     """Main function to parse arguments and call appropriate functions."""
-    parser = argparse.ArgumentParser(description="Android vendor_boot Patcher and vbmeta Remaker.")
+    parser = argparse.ArgumentParser(description="Android Image Patcher and AVB Tool.")
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
 
-    parser_convert = subparsers.add_parser("convert", help="Convert vendor_boot and remake vbmeta.")
-    parser_convert.add_argument("--with-root", action="store_true", help="Patch boot.img with KernelSU before converting.")
-
-    parser_info = subparsers.add_parser("info", help="Display information about image files or directories.")
+    subparsers.add_parser("convert", help="Convert vendor_boot region and remake vbmeta.")
+    subparsers.add_parser("root", help="Patch boot.img with KernelSU only.")
+    parser_info = subparsers.add_parser("info", help="Display AVB info for image files or directories.")
     parser_info.add_argument("files", nargs='+', help="Image file(s) or folder(s) to inspect.")
 
     args = parser.parse_args()
 
     try:
         if args.command == "convert":
-            convert_images(args.with_root)
+            convert_images()
+        elif args.command == "root":
+            root_boot_only()
         elif args.command == "info":
             show_image_info(args.files)
     except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, SystemExit) as e:
