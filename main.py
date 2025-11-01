@@ -21,6 +21,10 @@ OUTPUT_ROOT_DIR = BASE_DIR / "output_root"
 OUTPUT_DP_DIR = BASE_DIR / "output_dp"
 BACKUP_DIR = BASE_DIR / "backup"
 WORK_DIR = BASE_DIR / "patch_work"
+INPUT_CURRENT_DIR = BASE_DIR / "input_current"
+INPUT_NEW_DIR = BASE_DIR / "input_new"
+OUTPUT_ANTI_ROLLBACK_DIR = BASE_DIR / "output_anti_rollback"
+
 
 PYTHON_EXE = PYTHON_DIR / "python.exe"
 AVBTOOL_PY = AVB_DIR / "avbtool.py"
@@ -188,6 +192,36 @@ def extract_image_avb_info(image_path):
         print(f"[Info] Parsed {len(props_args) // 2} properties.")
 
     return info
+
+def wait_for_files(directory, required_files, prompt_message):
+    """Waits for user to place files in a directory."""
+    directory.mkdir(exist_ok=True)
+    while True:
+        all_found = True
+        missing = []
+        for file in required_files:
+            if not (directory / file).exists():
+                all_found = False
+                missing.append(file)
+        
+        if all_found:
+            return True
+        
+        if platform.system() == "Windows":
+            os.system('cls')
+        else:
+            os.system('clear')
+            
+        print("--- WAITING FOR FILES ---")
+        print(prompt_message)
+        print(f"\nPlease place the following file(s) in the '{directory.name}' folder:")
+        for f in missing:
+            print(f" - {f}")
+        print("\nPress Enter when ready...")
+        try:
+            input()
+        except EOFError:
+            sys.exit(1)
 
 
 # --- Core Functions ---
@@ -861,6 +895,204 @@ def show_image_info(files):
     except IOError as e:
         print(f"[!] Error saving info to file: {e}", file=sys.stderr)
 
+def patch_chained_image_rollback(image_name, current_rb_index, new_image_path, patched_image_path):
+    """
+    Helper function to patch the rollback index of a chained partition image 
+    (like boot.img) using add_hash_footer.
+    This bypasses the device's anti-rollback protection.
+    """
+    key_map = {
+        "2597c218aae470a130f61162feaae70afd97f011": AVB_DIR / "testkey_rsa4096.pem",
+        "cdbb77177f731920bbe0a0f94f84d9038ae0617d": AVB_DIR / "testkey_rsa2048.pem"
+    }
+
+    try:
+        print(f"[*] Analyzing new {image_name}...")
+        info = extract_image_avb_info(new_image_path)
+        new_rb_index = int(info.get('rollback', '0'))
+        print(f"  > New index: {new_rb_index}")
+
+        if new_rb_index >= current_rb_index:
+            print(f"[*] {image_name} index is OK. Copying as is.")
+            shutil.copy(new_image_path, patched_image_path)
+            return
+
+        print(f"[!] Anti-Rollback Bypassed: Patching {image_name} from {new_rb_index} to {current_rb_index}...")
+
+        for key in ['partition_size', 'name', 'salt', 'algorithm', 'pubkey_sha1']:
+            if key not in info:
+                raise KeyError(f"Could not find '{key}' in '{new_image_path.name}' AVB info.")
+        
+        key_file = key_map.get(info['pubkey_sha1'])
+        if not key_file:
+            raise KeyError(f"Unknown public key SHA1 {info['pubkey_sha1']} in {new_image_path.name}")
+
+        shutil.copy(new_image_path, patched_image_path)
+        
+        add_footer_cmd = [
+            str(PYTHON_EXE), str(AVBTOOL_PY), "add_hash_footer",
+            "--image", str(patched_image_path), 
+            "--key", str(key_file),
+            "--algorithm", info['algorithm'], 
+            "--partition_size", info['partition_size'],
+            "--partition_name", info['name'], 
+            "--salt", info['salt'],
+            "--rollback_index", str(current_rb_index),
+            *info.get('props_args', [])
+        ]
+        
+        if 'flags' in info:
+            add_footer_cmd.extend(["--flags", info.get('flags', '0')])
+
+        run_command(add_footer_cmd)
+        print(f"[+] Successfully patched {image_name}.")
+
+    except (KeyError, subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"[!] Error processing {image_name}: {e}", file=sys.stderr)
+        raise
+
+def patch_vbmeta_image_rollback(image_name, current_rb_index, new_image_path, patched_image_path):
+    """
+    Helper function to patch the rollback index of a main vbmeta image 
+    (like vbmeta_system.img) using make_vbmeta_image.
+    This bypasses the device's anti-rollback protection.
+    """
+    key_map = {
+        "2597c218aae470a130f61162feaae70afd97f011": AVB_DIR / "testkey_rsa4096.pem",
+        "cdbb77177f731920bbe0a0f94f84d9038ae0617d": AVB_DIR / "testkey_rsa2048.pem"
+    }
+
+    try:
+        print(f"[*] Analyzing new {image_name}...")
+        info = extract_image_avb_info(new_image_path)
+        new_rb_index = int(info.get('rollback', '0'))
+        print(f"  > New index: {new_rb_index}")
+
+        if new_rb_index >= current_rb_index:
+            print(f"[*] {image_name} index is OK. Copying as is.")
+            shutil.copy(new_image_path, patched_image_path)
+            return
+
+        print(f"[!] Anti-Rollback Bypassed: Patching {image_name} from {new_rb_index} to {current_rb_index}...")
+
+        for key in ['algorithm', 'pubkey_sha1']:
+            if key not in info:
+                raise KeyError(f"Could not find '{key}' in '{new_image_path.name}' AVB info.")
+        
+        key_file = key_map.get(info['pubkey_sha1'])
+        if not key_file:
+            raise KeyError(f"Unknown public key SHA1 {info['pubkey_sha1']} in {new_image_path.name}")
+
+        remake_cmd = [
+            str(PYTHON_EXE), str(AVBTOOL_PY), "make_vbmeta_image",
+            "--output", str(patched_image_path),
+            "--key", str(key_file),
+            "--algorithm", info['algorithm'],
+            "--rollback_index", str(current_rb_index),
+            "--flags", info.get('flags', '0'),
+            "--include_descriptors_from_image", str(new_image_path)
+        ]
+        
+        run_command(remake_cmd)
+        print(f"[+] Successfully patched {image_name}.")
+
+    except (KeyError, subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"[!] Error processing {image_name}: {e}", file=sys.stderr)
+        raise
+
+def anti_rollback():
+    """Bypasses anti-rollback protection by patching downgrade firmware images."""
+    print("--- Anti-Anti-Rollback Patcher ---")
+    print("This tool patches new firmware images (for downgrading)")
+    print("to match your currently installed firmware's rollback index.")
+    print("-" * 50)
+    check_dependencies()
+    
+    if OUTPUT_ANTI_ROLLBACK_DIR.exists():
+        shutil.rmtree(OUTPUT_ANTI_ROLLBACK_DIR)
+    OUTPUT_ANTI_ROLLBACK_DIR.mkdir(exist_ok=True)
+
+    current_files = ["boot.img", "vbmeta_system.img"]
+    current_prompt = (
+        "[STEP 1] Place the firmware files from your CURRENTLY INSTALLED OS version\n"
+        "         (e.g., from your device or a backup) into the folder below."
+    )
+    wait_for_files(INPUT_CURRENT_DIR, current_files, current_prompt)
+    
+    print("\n[*] Extracting current firmware rollback indices...")
+    try:
+        current_boot_info = extract_image_avb_info(INPUT_CURRENT_DIR / "boot.img")
+        current_boot_rb = int(current_boot_info.get('rollback', '0'))
+        
+        current_vbmeta_info = extract_image_avb_info(INPUT_CURRENT_DIR / "vbmeta_system.img")
+        current_vbmeta_rb = int(current_vbmeta_info.get('rollback', '0'))
+    except Exception as e:
+        print(f"[!] Error reading current image info: {e}. Please check files.", file=sys.stderr)
+        return
+
+    print(f"  > Current Boot Index: {current_boot_rb}")
+    print(f"  > Current VBMeta System Index: {current_vbmeta_rb}")
+
+    new_files = ["boot.img", "vbmeta_system.img"]
+    new_prompt = (
+        "[STEP 2] Place the NEW firmware files you want to FLASH\n"
+        "         (e.g., the downgrade firmware) into the folder below."
+    )
+    wait_for_files(INPUT_NEW_DIR, new_files, new_prompt)
+    
+    print("\n[*] Extracting new firmware rollback indices...")
+    try:
+        new_boot_info = extract_image_avb_info(INPUT_NEW_DIR / "boot.img")
+        new_boot_rb = int(new_boot_info.get('rollback', '0'))
+        
+        new_vbmeta_info = extract_image_avb_info(INPUT_NEW_DIR / "vbmeta_system.img")
+        new_vbmeta_rb = int(new_vbmeta_info.get('rollback', '0'))
+    except Exception as e:
+        print(f"[!] Error reading new image info: {e}. Please check files.", file=sys.stderr)
+        return
+
+    print(f"  > New Boot Index: {new_boot_rb}")
+    print(f"  > New VBMeta System Index: {new_vbmeta_rb}")
+
+    if new_boot_rb >= current_boot_rb and new_vbmeta_rb >= current_vbmeta_rb:
+        print("\n[+] New firmware indices are the same or higher.")
+        print("This is not a downgrade. No patching is necessary.")
+        print("Press Enter to exit.")
+        try:
+            input()
+        except EOFError:
+            pass
+        return
+
+    print("\n[!] Downgrade detected! Bypassing anti-rollback...")
+    
+    try:
+        patch_chained_image_rollback(
+            image_name="boot.img",
+            current_rb_index=current_boot_rb,
+            new_image_path=(INPUT_NEW_DIR / "boot.img"),
+            patched_image_path=(OUTPUT_ANTI_ROLLBACK_DIR / "boot.img")
+        )
+        
+        print("-" * 20)
+
+        patch_vbmeta_image_rollback(
+            image_name="vbmeta_system.img",
+            current_rb_index=current_vbmeta_rb,
+            new_image_path=(INPUT_NEW_DIR / "vbmeta_system.img"),
+            patched_image_path=(OUTPUT_ANTI_ROLLBACK_DIR / "vbmeta_system.img")
+        )
+
+        print("\n" + "=" * 61)
+        print("  SUCCESS!")
+        print(f"  Anti-rollback patched images are in '{OUTPUT_ANTI_ROLLBACK_DIR.name}'.")
+        print(f"  You can now flash these images to downgrade.")
+        print("=" * 61)
+
+    except Exception as e:
+        print(f"\n[!] An error occurred during patching: {e}", file=sys.stderr)
+        shutil.rmtree(OUTPUT_ANTI_ROLLBACK_DIR) # Clean up partial output
+
 def main():
     """Main function to parse arguments and call appropriate functions."""
     parser = argparse.ArgumentParser(description="Android Image Patcher and AVB Tool.")
@@ -871,6 +1103,7 @@ def main():
     subparsers.add_parser("edit_dp", help="Edit devinfo and persist images.")
     subparsers.add_parser("read_edl", help="Read devinfo and persist images via EDL.")
     subparsers.add_parser("write_edl", help="Write patched devinfo and persist images via EDL.")
+    subparsers.add_parser("anti_rollback", help="Bypass anti-rollback (downgrade) protection by patching firmware indices.")
     parser_info = subparsers.add_parser("info", help="Display AVB info for image files or directories.")
     parser_info.add_argument("files", nargs='+', help="Image file(s) or folder(s) to inspect.")
 
@@ -887,6 +1120,8 @@ def main():
             read_edl()
         elif args.command == "write_edl":
             write_edl()
+        elif args.command == "anti_rollback":
+            anti_rollback()
         elif args.command == "info":
             show_image_info(args.files)
     except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, SystemExit) as e:
