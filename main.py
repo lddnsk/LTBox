@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -23,19 +24,22 @@ BACKUP_DIR = BASE_DIR / "backup"
 WORK_DIR = BASE_DIR / "patch_work"
 
 # --- Input Directories ---
-INPUT_DIR = BASE_DIR / "input"
-INPUT_ROOT_DIR = BASE_DIR / "input_root"
-INPUT_DP_DIR = BASE_DIR / "input_dp"
 INPUT_CURRENT_DIR = BASE_DIR / "input_current"
 INPUT_NEW_DIR = BASE_DIR / "input_new"
 
 OUTPUT_ANTI_ROLLBACK_DIR = BASE_DIR / "output_anti_rollback"
+
+# --- Main Firmware Source / XML Dirs ---
+IMAGE_DIR = BASE_DIR / "image"
+WORKING_DIR = BASE_DIR / "working"
+OUTPUT_XML_DIR = BASE_DIR / "output_xml"
 
 
 PYTHON_EXE = PYTHON_DIR / "python.exe"
 AVBTOOL_PY = AVB_DIR / "avbtool.py"
 EDIT_IMAGES_PY = TOOLS_DIR / "edit_images.py"
 GET_KERNEL_VER_PY = TOOLS_DIR / "get_kernel_ver.py"
+DECRYPT_PY = TOOLS_DIR / "decrypt_x.py"
 
 MAGISKBOOT_REPO_URL = "https://github.com/PinNaCode/magiskboot_build"
 MAGISKBOOT_TAG = "last-ci"
@@ -54,7 +58,8 @@ EDL_NG_REPO_URL = "https://github.com/strongtz/edl-ng"
 EDL_NG_TAG = "v1.4.1"
 
 EDL_LOADER_FILENAME = "xbl_s_devprg_ns.melf"
-EDL_LOADER_FILE = INPUT_DP_DIR / EDL_LOADER_FILENAME
+EDL_LOADER_FILE = IMAGE_DIR / EDL_LOADER_FILENAME 
+EDL_LOADER_FILE_IMAGE = IMAGE_DIR / EDL_LOADER_FILENAME
 
 KEY_MAP = {
     "2597c218aae470a130f61162feaae70afd97f011": AVB_DIR / "testkey_rsa4096.pem",
@@ -226,6 +231,27 @@ def wait_for_files(directory, required_files, prompt_message):
         print(f"\nPlease place the following file(s) in the '{directory.name}' folder:")
         for f in missing:
             print(f" - {f}")
+        print("\nPress Enter when ready...")
+        try:
+            input()
+        except EOFError:
+            sys.exit(1)
+
+def wait_for_directory(directory, prompt_message):
+    directory.mkdir(exist_ok=True)
+    while True:
+        if directory.is_dir() and any(directory.iterdir()):
+             return True
+        
+        if platform.system() == "Windows":
+            os.system('cls')
+        else:
+            os.system('clear')
+            
+        print("--- WAITING FOR FOLDER ---")
+        print(prompt_message)
+        print(f"\nPlease copy the entire folder into this directory:")
+        print(f" - {directory.name}{os.sep}")
         print("\nPress Enter when ready...")
         try:
             input()
@@ -462,15 +488,15 @@ def patch_boot_with_root():
         os.chmod(fetch_exe, 0o755)
 
     print("--- Waiting for boot.img ---") 
-    INPUT_ROOT_DIR.mkdir(exist_ok=True) 
+    IMAGE_DIR.mkdir(exist_ok=True) 
     required_files = ["boot.img"]
     prompt = (
         "[STEP 1] Place your stock 'boot.img' file\n"
-        "         (e.g., from your device or firmware) into the 'input_root' folder."
+        f"         (e.g., from your firmware) into the '{IMAGE_DIR.name}' folder."
     )
-    wait_for_files(INPUT_ROOT_DIR, required_files, prompt)
+    wait_for_files(IMAGE_DIR, required_files, prompt)
     
-    boot_img_src = INPUT_ROOT_DIR / "boot.img"
+    boot_img_src = IMAGE_DIR / "boot.img"
     boot_img = BASE_DIR / "boot.img" 
     
     try:
@@ -553,16 +579,16 @@ def convert_images():
     print()
 
     print("--- Waiting for vendor_boot.img and vbmeta.img ---") 
-    INPUT_DIR.mkdir(exist_ok=True)
+    IMAGE_DIR.mkdir(exist_ok=True)
     required_files = ["vendor_boot.img", "vbmeta.img"]
     prompt = (
         "[STEP 1] Place the required firmware files for conversion\n"
-        "         (e.g., from your PRC firmware) into the 'input' folder."
+        f"         (e.g., from your PRC firmware) into the '{IMAGE_DIR.name}' folder."
     )
-    wait_for_files(INPUT_DIR, required_files, prompt)
+    wait_for_files(IMAGE_DIR, required_files, prompt)
     
-    vendor_boot_src = INPUT_DIR / "vendor_boot.img"
-    vbmeta_src = INPUT_DIR / "vbmeta.img"
+    vendor_boot_src = IMAGE_DIR / "vendor_boot.img"
+    vbmeta_src = IMAGE_DIR / "vbmeta.img"
 
     print("--- Backing up original images ---")
     vendor_boot_bak = BASE_DIR / "vendor_boot.bak.img"
@@ -741,10 +767,10 @@ def edit_devinfo_persist():
     print("--- Starting devinfo & persist patching process ---")
     
     print("--- Waiting for devinfo.img / persist.img ---") 
-    INPUT_DP_DIR.mkdir(exist_ok=True) 
+    BACKUP_DIR.mkdir(exist_ok=True) 
 
-    devinfo_img_src = INPUT_DP_DIR / "devinfo.img"
-    persist_img_src = INPUT_DP_DIR / "persist.img"
+    devinfo_img_src = BACKUP_DIR / "devinfo.img"
+    persist_img_src = BACKUP_DIR / "persist.img"
     
     devinfo_img = BASE_DIR / "devinfo.img"
     persist_img = BASE_DIR / "persist.img"
@@ -752,7 +778,7 @@ def edit_devinfo_persist():
     if not devinfo_img_src.exists() and not persist_img_src.exists():
         prompt = (
             "[STEP 1] Place 'devinfo.img' and/or 'persist.img'\n"
-            f"         (e.g., from a backup or 'read_edl.bat') into the '{INPUT_DP_DIR.name}' folder."
+            f"         (e.g., from 'Dump' menu) into the '{BACKUP_DIR.name}' folder."
         )
         while not devinfo_img_src.exists() and not persist_img_src.exists():
             if platform.system() == "Windows":
@@ -761,7 +787,7 @@ def edit_devinfo_persist():
                 os.system('clear')
             print("--- WAITING FOR FILES ---")
             print(prompt)
-            print(f"\nPlease place at least one file in the '{INPUT_DP_DIR.name}' folder:")
+            print(f"\nPlease place at least one file in the '{BACKUP_DIR.name}' folder:")
             print(" - devinfo.img")
             print(" - persist.img")
             print("\nPress Enter when ready...")
@@ -828,18 +854,18 @@ def read_edl():
     
     edl_ng_exe = _ensure_edl_ng()
     
-    INPUT_DP_DIR.mkdir(exist_ok=True)
-    devinfo_out = INPUT_DP_DIR / "devinfo.img"
-    persist_out = INPUT_DP_DIR / "persist.img"
+    BACKUP_DIR.mkdir(exist_ok=True)
+    devinfo_out = BACKUP_DIR / "devinfo.img"
+    persist_out = BACKUP_DIR / "persist.img"
 
     print(f"--- Waiting for EDL Loader File ---")
     required_files = [EDL_LOADER_FILENAME]
     prompt = (
         f"[STEP 1] Place the EDL loader file ('{EDL_LOADER_FILENAME}')\n"
-        f"         into the '{INPUT_DP_DIR.name}' folder to proceed."
+        f"         into the '{IMAGE_DIR.name}' folder to proceed."
     )
-    wait_for_files(INPUT_DP_DIR, required_files, prompt)
-    print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{INPUT_DP_DIR.name}'.")
+    wait_for_files(IMAGE_DIR, required_files, prompt)
+    print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{IMAGE_DIR.name}'.")
 
     if not check_edl_device():
         sys.exit(1)
@@ -867,7 +893,7 @@ def read_edl():
         print(f"[!] Failed to read 'persist': {e}", file=sys.stderr)
 
     print(f"\n--- EDL Read Process Finished ---")
-    print(f"[*] Files have been saved to the '{INPUT_DP_DIR.name}' folder.")
+    print(f"[*] Files have been saved to the '{BACKUP_DIR.name}' folder.")
     print(f"[*] You can now run 'Patch devinfo/persist' (Menu 3) to patch them.")
 
 
@@ -886,11 +912,11 @@ def write_edl():
     required_files = [EDL_LOADER_FILENAME]
     prompt = (
         f"[STEP 1] Place the EDL loader file ('{EDL_LOADER_FILENAME}')\n"
-        f"         into the '{INPUT_DP_DIR.name}' folder to proceed."
+        f"         into the '{IMAGE_DIR.name}' folder to proceed."
     )
-    INPUT_DP_DIR.mkdir(exist_ok=True) 
-    wait_for_files(INPUT_DP_DIR, required_files, prompt)
-    print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{INPUT_DP_DIR.name}'.")
+    IMAGE_DIR.mkdir(exist_ok=True) 
+    wait_for_files(IMAGE_DIR, required_files, prompt)
+    print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{IMAGE_DIR.name}'.")
 
     if not check_edl_device():
         sys.exit(1)
@@ -1093,7 +1119,6 @@ def anti_rollback():
         shutil.rmtree(OUTPUT_ANTI_ROLLBACK_DIR)
     OUTPUT_ANTI_ROLLBACK_DIR.mkdir(exist_ok=True)
     
-    # --- 1. Get Current Firmware Indices (via EDL) ---
     print("\n--- [STEP 1] Dumping Current Firmware via EDL ---")
     edl_ng_exe = _ensure_edl_ng()
     
@@ -1105,10 +1130,10 @@ def anti_rollback():
     required_loader = [EDL_LOADER_FILENAME]
     loader_prompt = (
         f"[REQUIRED] Place the EDL loader file ('{EDL_LOADER_FILENAME}')\n"
-        f"         into the '{INPUT_DP_DIR.name}' folder to dump current firmware."
+        f"         into the '{IMAGE_DIR.name}' folder to dump current firmware."
     )
-    wait_for_files(INPUT_DP_DIR, required_loader, loader_prompt)
-    print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{INPUT_DP_DIR.name}'.")
+    wait_for_files(IMAGE_DIR, required_loader, loader_prompt)
+    print(f"[+] Loader file '{EDL_LOADER_FILE.name}' found in '{IMAGE_DIR.name}'.")
 
     if not check_edl_device():
         sys.exit(1)
@@ -1123,7 +1148,7 @@ def anti_rollback():
         print(f"[+] Successfully read 'boot' to '{boot_out}'.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"[!] Failed to read 'boot': {e}", file=sys.stderr)
-        sys.exit(1) # Exit if we can't get the current boot image
+        sys.exit(1) 
 
     print("\n[*] Attempting to read 'vbmeta_system' partition...")
     try:
@@ -1135,7 +1160,7 @@ def anti_rollback():
         print(f"[+] Successfully read 'vbmeta_system' to '{vbmeta_out}'.")
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"[!] Failed to read 'vbmeta_system': {e}", file=sys.stderr)
-        sys.exit(1) # Exit if we can't get the current vbmeta
+        sys.exit(1) 
         
     print("\n--- [STEP 1] Dump complete ---")
     
@@ -1153,7 +1178,6 @@ def anti_rollback():
     print(f"  > Current Boot Index: {current_boot_rb}")
     print(f"  > Current VBMeta System Index: {current_vbmeta_rb}")
 
-    # --- 2. Get New Firmware Indices (from User) ---
     new_files = ["boot.img", "vbmeta_system.img"]
     new_prompt = (
         "\n--- [STEP 2] Waiting for New Firmware ---\n"
@@ -1176,7 +1200,6 @@ def anti_rollback():
     print(f"  > New Boot Index: {new_boot_rb}")
     print(f"  > New VBMeta System Index: {new_vbmeta_rb}")
 
-    # --- 3. Compare and Patch ---
     if new_boot_rb >= current_boot_rb and new_vbmeta_rb >= current_vbmeta_rb:
         print("\n[+] New firmware indices are the same or higher.")
         print("This is not a downgrade. No patching is necessary.")
@@ -1222,12 +1245,14 @@ def clean_workspace():
     print("The 'python3' and 'backup' folders will NOT be removed.")
     print("-" * 50)
 
-    # --- Folders for full removal ---
     folders_to_remove = [
-        INPUT_DIR, INPUT_ROOT_DIR, INPUT_DP_DIR, INPUT_CURRENT_DIR, INPUT_NEW_DIR,
+        INPUT_CURRENT_DIR, INPUT_NEW_DIR,
         OUTPUT_DIR, OUTPUT_ROOT_DIR, OUTPUT_DP_DIR, OUTPUT_ANTI_ROLLBACK_DIR,
         WORK_DIR,
-        AVB_DIR 
+        AVB_DIR,
+        IMAGE_DIR,
+        WORKING_DIR,
+        OUTPUT_XML_DIR
     ]
     
     print("[*] Removing directories...")
@@ -1241,7 +1266,6 @@ def clean_workspace():
         else:
             print(f"  > Skipping (not found): {folder.name}{os.sep}")
 
-    # --- Files to remove from TOOLS_DIR ---
     print("\n[*] Removing downloaded tools from 'tools' folder...")
     tools_files_to_remove = [
         "fetch.exe", "fetch-linux", "fetch-macos",
@@ -1264,7 +1288,6 @@ def clean_workspace():
     if cleaned_tools_files == 0:
         print("  > No downloaded tools found to clean.")
 
-    # --- Files to remove from BASE_DIR ---
     print("\n[*] Cleaning up temporary files from root directory...")
     file_patterns_to_remove = [
         "*.bak.img",
@@ -1294,6 +1317,219 @@ def clean_workspace():
 
     print("\n--- Cleanup Finished ---")
 
+def modify_xml():
+    print("--- Starting XML Modification Process ---")
+
+    if not DECRYPT_PY.exists():
+        print(f"[!] Error: Decryption script not found at '{DECRYPT_PY}'")
+        print("[!] Please ensure 'decrypt_x.py' is in the 'tools' folder.")
+        sys.exit(1)
+        
+    print("--- Waiting for 'image' folder ---")
+    prompt = (
+        "[STEP 1] Please copy the entire 'image' folder from your\n"
+        "         unpacked Lenovo RSA firmware into the main directory."
+    )
+    wait_for_directory(IMAGE_DIR, prompt)
+
+    if WORKING_DIR.exists():
+        shutil.rmtree(WORKING_DIR)
+    if OUTPUT_XML_DIR.exists():
+        shutil.rmtree(OUTPUT_XML_DIR)
+    
+    WORKING_DIR.mkdir()
+    print(f"\n[*] Created temporary '{WORKING_DIR.name}' folder.")
+
+    print("[*] Decrypting *.x files and moving to 'working' folder...")
+    xml_files = []
+    for file in IMAGE_DIR.glob("*.x"):
+        out_file = WORKING_DIR / file.with_suffix('.xml').name
+        try:
+            run_command([str(PYTHON_EXE), str(DECRYPT_PY), str(file), str(out_file)])
+            print(f"  > Decrypted: {file.name} -> {out_file.name}")
+            xml_files.append(out_file)
+        except Exception as e:
+            print(f"[!] Failed to decrypt {file.name}: {e}", file=sys.stderr)
+            
+    if not xml_files:
+        print(f"[!] No '*.x' files found in '{IMAGE_DIR.name}'. Aborting.")
+        shutil.rmtree(WORKING_DIR)
+        sys.exit(1)
+
+    print("\n[*] Modifying 'contents.xml'...")
+    contents_xml = WORKING_DIR / "contents.xml"
+    if contents_xml.exists():
+        try:
+            with open(contents_xml, 'r', encoding='utf-8') as f:
+                content = f.read()
+            content = content.replace("rawprogram_unsparse4.xml", "rawprogram4.xml")
+            content = content.replace("rawprogram_unsparse0.xml", "rawprogram_save_persist_unsparse0.xml")
+            with open(contents_xml, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print("  > Patched 'contents.xml' successfully.")
+        except Exception as e:
+            print(f"[!] Error patching 'contents.xml': {e}", file=sys.stderr)
+    else:
+        print("  > 'contents.xml' not found. Skipping.")
+
+    print("\n[*] Modifying 'rawprogram_save_persist_unsparse0.xml'...")
+    rawprogram_save = WORKING_DIR / "rawprogram_save_persist_unsparse0.xml"
+    if rawprogram_save.exists():
+        try:
+            with open(rawprogram_save, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            for i in range(1, 11):
+                content = content.replace(f'filename="metadata_{i}.img"', '')
+            for i in range(1, 21):
+                content = content.replace(f'filename="userdata_{i}.img"', '')
+                
+            with open(rawprogram_save, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print("  > Patched 'rawprogram_save_persist_unsparse0.xml' successfully.")
+        except Exception as e:
+            print(f"[!] Error patching 'rawprogram_save_persist_unsparse0.xml': {e}", file=sys.stderr)
+    else:
+        print("  > 'rawprogram_save_persist_unsparse0.xml' not found. Skipping.")
+
+    print("\n[*] Modifying 'rawprogram4.xml'...")
+    rawprogram4 = WORKING_DIR / "rawprogram4.xml"
+    if rawprogram4.exists():
+        try:
+            with open(rawprogram4, 'r', encoding='utf-8') as f:
+                content = f.read()
+            content = content.replace('filename="vm-bootsys.img"', '')
+            content = content.replace('filename="vm-persist.img"', '')
+            with open(rawprogram4, 'w', encoding='utf-8') as f:
+                f.write(content)
+            print("  > Patched 'rawprogram4.xml' successfully.")
+        except Exception as e:
+            print(f"[!] Error patching 'rawprogram4.xml': {e}", file=sys.stderr)
+    else:
+        print("  > 'rawprogram4.xml' not found. Skipping.")
+
+    print("\n[*] Deleting unnecessary XML files...")
+    files_to_delete = [
+        WORKING_DIR / "rawprogram_unsparse0.xml",
+        *WORKING_DIR.glob("*_WIPE_PARTITIONS.xml"),
+        *WORKING_DIR.glob("*_BLANK_GPT.xml")
+    ]
+    for f in files_to_delete:
+        if f.exists():
+            f.unlink()
+            print(f"  > Deleted: {f.name}")
+
+    shutil.move(WORKING_DIR, OUTPUT_XML_DIR)
+    print(f"\n[*] Renamed '{WORKING_DIR.name}' to '{OUTPUT_XML_DIR.name}'.")
+    
+    print("\n" + "=" * 61)
+    print("  SUCCESS!")
+    print(f"  Modified XML files are ready in the '{OUTPUT_XML_DIR.name}'.")
+    print("  You can now run 'Flash EDL' (Menu 8).")
+    print("=" * 61)
+
+def flash_edl():
+    print("--- Starting Full EDL Flash Process ---")
+    
+    edl_ng_exe = _ensure_edl_ng()
+
+    if not IMAGE_DIR.is_dir() or not any(IMAGE_DIR.iterdir()):
+        print(f"[!] Error: The '{IMAGE_DIR.name}' folder is missing or empty.")
+        print("[!] Please run 'Modify XML for Update' (Menu 7) first.")
+        sys.exit(1)
+        
+    loader_path = EDL_LOADER_FILE_IMAGE
+    if not loader_path.exists():
+        print(f"[!] Error: EDL Loader '{loader_path.name}' not found in '{IMAGE_DIR.name}' folder.")
+        print("[!] Please copy it to the 'image' folder (from 'input_dp' or firmware).")
+        sys.exit(1)
+
+    print("\n" + "="*61)
+    print("  WARNING: PROCEEDING WILL OVERWRITE FILES IN YOUR 'image'")
+    print("           FOLDER WITH ANY PATCHED FILES YOU HAVE CREATED")
+    print("           (e.g., from Menu 1, 5, 6, or 7).")
+    print("="*61 + "\n")
+    
+    choice = ""
+    while choice not in ['y', 'n']:
+        choice = input("Are you sure you want to continue? (y/n): ").lower().strip()
+
+    if choice == 'n':
+        print("[*] Operation cancelled.")
+        return
+
+    print("\n[*] Copying patched files to 'image' folder (overwriting)...")
+    output_folders_to_copy = [
+        OUTPUT_DIR, 
+        OUTPUT_ROOT_DIR, 
+        OUTPUT_ANTI_ROLLBACK_DIR,
+        OUTPUT_XML_DIR 
+    ]
+    
+    copied_count = 0
+    for folder in output_folders_to_copy:
+        if folder.exists():
+            try:
+                shutil.copytree(folder, IMAGE_DIR, dirs_exist_ok=True)
+                print(f"  > Copied contents of '{folder.name}' to '{IMAGE_DIR.name}'.")
+                copied_count += 1
+            except Exception as e:
+                print(f"[!] Error copying files from {folder.name}: {e}", file=sys.stderr)
+    
+    if copied_count == 0:
+        print("[*] No 'output*' folders found. Proceeding with files already in 'image' folder.")
+    
+    print("\n[*] Waiting for Qualcomm EDL (9008) device...")
+    while not check_edl_device():
+        time.sleep(2)
+    
+    print("\n--- [STEP 1] Flashing main firmware via rawprogram ---")
+    raw_xmls = list(IMAGE_DIR.glob("rawprogram*.xml"))
+    patch_xmls = list(IMAGE_DIR.glob("patch*.xml"))
+    
+    if not raw_xmls:
+        print(f"[!] No 'rawprogram*.xml' files found in '{IMAGE_DIR.name}'. Cannot flash.")
+        sys.exit(1)
+        
+    cmd = [
+        str(edl_ng_exe), 
+        "--loader", str(loader_path), 
+        "--memory", "UFS", 
+        "rawprogram", 
+        *[str(p) for p in raw_xmls], 
+        *[str(p) for p in patch_xmls]
+    ]
+    
+    try:
+        run_command(cmd)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"[!] An error occurred during main flash: {e}", file=sys.stderr)
+        print("[!] The device may be in an unstable state. Do not reboot manually.")
+        sys.exit(1)
+        
+    print("\n--- [STEP 2] Flashing patched devinfo/persist ---")
+    
+    patched_devinfo = OUTPUT_DP_DIR / "devinfo.img"
+    patched_persist = OUTPUT_DP_DIR / "persist.img"
+
+    if not OUTPUT_DP_DIR.exists() or (not patched_devinfo.exists() and not patched_persist.exists()):
+        print(f"[*] '{OUTPUT_DP_DIR.name}' not found or is empty. Skipping devinfo/persist flash.")
+        print("[*] Attempting to reset device...")
+        try:
+            run_command([
+                str(edl_ng_exe),
+                "--loader", str(loader_path), 
+                "reset"
+            ])
+            print("[+] Device reset command sent.")
+        except Exception as e:
+             print(f"[!] Failed to reset device: {e}", file=sys.stderr)
+    else:
+        print("[*] 'output_dp' folder found. Proceeding to flash devinfo/persist...")
+        write_edl() 
+
+    print("\n--- Full EDL Flash Process Finished ---")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Android Image Patcher and AVB Tool.")
@@ -1306,6 +1542,8 @@ def main():
     subparsers.add_parser("write_edl", help="Write patched devinfo and persist images via EDL.")
     subparsers.add_parser("anti_rollback", help="Bypass anti-rollback (downgrade) protection by patching firmware indices.")
     subparsers.add_parser("clean", help="Remove downloaded tools, I/O folders, and temp files.")
+    subparsers.add_parser("modify_xml", help="Modify XML files from RSA firmware for flashing.")
+    subparsers.add_parser("flash_edl", help="Flash the entire modified firmware via EDL.")
     parser_info = subparsers.add_parser("info", help="Display AVB info for image files or directories.")
     parser_info.add_argument("files", nargs='+', help="Image file(s) or folder(s) to inspect.")
 
@@ -1326,6 +1564,10 @@ def main():
             anti_rollback()
         elif args.command == "clean":
             clean_workspace()
+        elif args.command == "modify_xml":
+            modify_xml()
+        elif args.command == "flash_edl":
+            flash_edl()
         elif args.command == "info":
             show_image_info(args.files)
     except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, SystemExit) as e:

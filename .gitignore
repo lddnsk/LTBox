@@ -5,12 +5,14 @@
 backup/
 desktop.ini
 get-pip.py
+image/
 input/
 input_dp/
 input_root/
 output/
 output_dp/
 output_root/
+output_xml/
 python3/
 tools/avb/
 tools/edl-ng.exe
@@ -19,3 +21,4 @@ tools/kernelsu.ko
 tools/ksuinit
 tools/magiskboot.exe
 tools/tmp_patch/
+working/

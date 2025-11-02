@@ -35,6 +35,7 @@ echo   ==========================================================
 echo     LTBox - Main Menu
 echo   ==========================================================
 echo.
+echo     --- Flashing Tools ---
 echo     1. Convert ROM (PRC to ROW)
 echo     2. Dump devinfo/persist via EDL
 echo     3. Patch devinfo/persist (Region Code Reset)
@@ -42,8 +43,13 @@ echo     4. Write devinfo/persist via EDL (Flash patched)
 echo     5. Create Rooted boot.img
 echo     6. Bypass Anti-Rollback (Firmware Downgrade)
 echo.
-echo     7. Clean Workspace (Remove tools and I/O folders)
-echo     8. Exit
+echo     --- Full Firmware Tools (RSA Firmware) ---
+echo     7. Modify XML for Update (Decrypts *.x, modifies XMLs)
+echo     8. Flash EDL (Flashes full firmware from 'image' folder)
+echo.
+echo     --- Maintenance ---
+echo     9. Clean Workspace (Remove tools and I/O folders)
+echo     10. Exit
 echo.
 echo   ==========================================================
 echo.
@@ -58,9 +64,11 @@ if "%CHOICE%"=="3" call :run_task edit_dp "Patch devinfo/persist"
 if "%CHOICE%"=="4" call :run_task write_edl "EDL Write devinfo/persist"
 if "%CHOICE%"=="5" call :run_task root "Root boot.img"
 if "%CHOICE%"=="6" call :run_task anti_rollback "Anti-Rollback Bypass"
+if "%CHOICE%"=="7" call :run_task modify_xml "Modify XML for Update"
+if "%CHOICE%"=="8" call :run_task flash_edl "Full EDL Flash"
 
-:: --- Modified logic for Choice 7 ---
-if "%CHOICE%"=="7" (
+:: --- Modified logic for Choice 9 (Clean) ---
+if "%CHOICE%"=="9" (
     cls
     echo ==========================================================
     echo  Starting Task: [Workspace Cleanup]...
@@ -77,11 +85,11 @@ if "%CHOICE%"=="7" (
     goto :cleanup
 )
 
-if "%CHOICE%"=="8" goto :cleanup
+if "%CHOICE%"=="10" goto :cleanup
 
 :: Handle invalid input
 echo.
-echo     [!] Invalid choice. Please enter a number from 1-8.
+echo     [!] Invalid choice. Please enter a number from 1-10.
 pause
 goto :main_menu
 
