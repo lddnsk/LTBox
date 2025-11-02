@@ -49,7 +49,7 @@ KSU_APK_TAG = "v1.1.1"
 
 RELEASE_OWNER = "WildKernels"
 RELEASE_REPO = "GKI_KernelSU_SUSFS"
-RELEASE_TAG = "v1.5.9-r36"
+RELEASE_TAG = "v1.5.12-r16"
 REPO_URL = f"https://github.com/{RELEASE_OWNER}/{RELEASE_REPO}"
 
 ANYKERNEL_ZIP_FILENAME = "AnyKernel3.zip"
