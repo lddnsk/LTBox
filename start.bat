@@ -23,7 +23,8 @@ if not exist "%PYTHON_EXE%" (
 )
 if not exist "%MAIN_PY%" (
     echo [!] Main script not found at: %MAIN_PY%
-    pause
+   
+ pause
     goto :eof
 )
 
@@ -35,26 +36,27 @@ echo   ==========================================================
 echo     LTBox - Main
 echo   ==========================================================
 echo.
-echo     1. Patch ^& Flash ROW ROM to PRC device
-echo     2. Create Rooted boot.img
+echo     1. Install ROW ROM to PRC device (WIPE DATA)
+echo     2. Update ROW ROM on PRC device (NO WIPE)
+echo     3. Create Rooted boot.img
 echo.
 echo     a. Advanced
 echo     x. Exit
 echo.
 echo   ==========================================================
 echo.
-
 set "CHOICE="
-set /p "CHOICE=    Enter your choice (1, 2, a, e): "
+set /p "CHOICE=    Enter your choice (1, 2, 3, a, x): "
 
-if /I "%CHOICE%"=="1" call :run_task patch_all "Full Patch and Flash ROW ROM"
-if /I "%CHOICE%"=="2" call :run_task root "Root boot.img"
+if /I "%CHOICE%"=="1" call :run_task patch_all_wipe "Install ROW ROM (WIPE DATA)"
+if /I "%CHOICE%"=="2" call :run_task patch_all "Update ROW ROM (NO WIPE)"
+if /I "%CHOICE%"=="3" call :run_task root "Root boot.img"
 if /I "%CHOICE%"=="a" goto :advanced_menu
 if /I "%CHOICE%"=="x" goto :cleanup
 
 :: Handle invalid input
 echo.
-echo     [!] Invalid choice. Please enter 1, 2, a, or e.
+echo     [!] Invalid choice. Please enter 1, 2, 3, a, or x.
 pause
 goto :main_menu
 
@@ -82,7 +84,6 @@ echo     m. Back to Main
 echo.
 echo   ==========================================================
 echo.
-
 set "ADV_CHOICE="
 set /p "ADV_CHOICE=    Enter your choice (1-10, m): "
 
@@ -98,15 +99,16 @@ if "%ADV_CHOICE%"=="9" call :run_task flash_edl "Flash ROM to device"
 
 if "%ADV_CHOICE%"=="10" (
     cls
-    echo ==========================================================
+  
+  echo ==========================================================
     echo  Starting Task: [Workspace Cleanup]...
     echo ==========================================================
     echo.
-    "%PYTHON_EXE%" "%MAIN_PY%" clean
+"%PYTHON_EXE%" "%MAIN_PY%" clean
     echo.
     echo ==========================================================
     echo  Task [Workspace Cleanup] has completed.
-    echo ==========================================================
+echo ==========================================================
     echo.
     echo Press any key to exit...
     pause > nul
@@ -128,7 +130,6 @@ echo ==========================================================
 echo  Starting Task: [%~2]...
 echo ==========================================================
 echo.
-
 :: %1 is the main.py argument (e.g., convert), %~2 is the description string
 "%PYTHON_EXE%" "%MAIN_PY%" %1
 
@@ -141,6 +142,7 @@ echo Press any key to return...
 pause > nul
 
 :: If the task was from the Main menu, return to Main
+if "%1"=="patch_all_wipe" goto :main_menu
 if "%1"=="patch_all" goto :main_menu
 if "%1"=="root" goto :main_menu
 

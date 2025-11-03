@@ -1414,7 +1414,7 @@ def clean_workspace():
 
     print("\n--- Cleanup Finished ---")
 
-def modify_xml():
+def modify_xml(wipe=0):
     print("--- Starting XML Modification Process ---")
 
     if not DECRYPT_PY.exists():
@@ -1455,19 +1455,30 @@ def modify_xml():
 
     print("\n[*] Modifying 'contents.xml'...")
     contents_xml = WORKING_DIR / "contents.xml"
-    if contents_xml.exists():
-        try:
-            with open(contents_xml, 'r', encoding='utf-8') as f:
-                content = f.read()
-            content = content.replace("rawprogram_unsparse4.xml", "rawprogram4.xml")
-            content = content.replace("rawprogram_unsparse0.xml", "rawprogram_save_persist_unsparse0.xml")
-            with open(contents_xml, 'w', encoding='utf-8') as f:
-                f.write(content)
-            print("  > Patched 'contents.xml' successfully.")
-        except Exception as e:
-            print(f"[!] Error patching 'contents.xml': {e}", file=sys.stderr)
-    else:
-        print("  > 'contents.xml' not found. Skipping.")
+    
+    if not contents_xml.exists():
+        print(f"[!] Error: 'contents.xml' not found in '{WORKING_DIR.name}'.")
+        print("[!] This file is essential for the flashing process. Aborting.")
+        shutil.rmtree(WORKING_DIR)
+        raise FileNotFoundError(f"contents.xml not found in {WORKING_DIR.name}")
+
+    try:
+        with open(contents_xml, 'r', encoding='utf-8') as f:
+            content = f.read()
+        content = content.replace("rawprogram_unsparse4.xml", "rawprogram4.xml")
+        content = content.replace("rawprogram_unsparse0.xml", "rawprogram_save_persist_unsparse0.xml")
+        with open(contents_xml, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print("  > Patched 'contents.xml' successfully.")
+    except Exception as e:
+        print(f"[!] Error patching 'contents.xml': {e}", file=sys.stderr)
+        raise
+
+    rawprogram4 = WORKING_DIR / "rawprogram4.xml"
+    rawprogram_unsparse4 = WORKING_DIR / "rawprogram_unsparse4.xml"
+    if not rawprogram4.exists() and rawprogram_unsparse4.exists():
+        print(f"[*] 'rawprogram4.xml' not found. Copying 'rawprogram_unsparse4.xml'...")
+        shutil.copy(rawprogram_unsparse4, rawprogram4)
 
     print("\n[*] Modifying 'rawprogram_save_persist_unsparse0.xml'...")
     rawprogram_save = WORKING_DIR / "rawprogram_save_persist_unsparse0.xml"
@@ -1476,10 +1487,14 @@ def modify_xml():
             with open(rawprogram_save, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            for i in range(1, 11):
-                content = content.replace(f'filename="metadata_{i}.img"', '')
-            for i in range(1, 21):
-                content = content.replace(f'filename="userdata_{i}.img"', '')
+            if wipe == 1:
+                print(f"  > [WIPE] Removing metadata and userdata entries...")
+                for i in range(1, 11):
+                    content = content.replace(f'filename="metadata_{i}.img"', '')
+                for i in range(1, 21):
+                    content = content.replace(f'filename="userdata_{i}.img"', '')
+            else:
+                print(f"  > [NO WIPE] Skipping metadata and userdata removal.")
                 
             with open(rawprogram_save, 'w', encoding='utf-8') as f:
                 f.write(content)
@@ -1490,13 +1505,23 @@ def modify_xml():
         print("  > 'rawprogram_save_persist_unsparse0.xml' not found. Skipping.")
 
     print("\n[*] Modifying 'rawprogram4.xml'...")
-    rawprogram4 = WORKING_DIR / "rawprogram4.xml"
     if rawprogram4.exists():
         try:
             with open(rawprogram4, 'r', encoding='utf-8') as f:
                 content = f.read()
-            content = content.replace('filename="vm-bootsys.img"', '')
-            content = content.replace('filename="vm-persist.img"', '')
+            
+            if not any(IMAGE_DIR.glob("vm-bootsys*.img")):
+                print("  > 'vm-bootsys' image not found. Removing from XML...")
+                content = content.replace('filename="vm-bootsys.img"', '')
+            else:
+                print("  > 'vm-bootsys' image found. Keeping in XML.")
+
+            if not any(IMAGE_DIR.glob("vm-persist*.img")):
+                print("  > 'vm-persist' image not found. Removing from XML...")
+                content = content.replace('filename="vm-persist.img"', '')
+            else:
+                print("  > 'vm-persist' image found. Keeping in XML.")
+
             with open(rawprogram4, 'w', encoding='utf-8') as f:
                 f.write(content)
             print("  > Patched 'rawprogram4.xml' successfully.")
@@ -1663,8 +1688,11 @@ def flash_edl(skip_reset=False, skip_reset_edl=False):
     if not skip_reset:
         print("\n--- Full EDL Flash Process Finished ---")
 
-def patch_all():
-    print("--- Starting Automated Patch & Flash ROW ROM Process ---")
+def patch_all(wipe=0):
+    if wipe == 1:
+        print("--- [WIPE MODE] Starting Automated Install & Flash ROW ROM Process ---")
+    else:
+        print("--- [NO WIPE MODE] Starting Automated Update & Flash ROW ROM Process ---")
     
     print("\n--- [STEP 1/7] Waiting for RSA Firmware 'image' folder ---")
     prompt = (
@@ -1685,7 +1713,7 @@ def patch_all():
         print("\n" + "="*61)
         print("  STEP 3/7: Modifying XML Files")
         print("="*61)
-        modify_xml()
+        modify_xml(wipe=wipe)
         print("\n--- [STEP 3/7] XML Modification SUCCESS ---")
         
         print("\n" + "="*61)
@@ -1749,7 +1777,8 @@ def main():
     subparsers.add_parser("clean", help="Remove downloaded tools, I/O folders, and temp files.")
     subparsers.add_parser("modify_xml", help="Modify XML files from RSA firmware for flashing.")
     subparsers.add_parser("flash_edl", help="Flash the entire modified firmware via EDL.")
-    subparsers.add_parser("patch_all", help="Run the full automated ROW flashing process.")
+    subparsers.add_parser("patch_all", help="Run the full automated ROW flashing process (NO WIPE).")
+    subparsers.add_parser("patch_all_wipe", help="Run the full automated ROW flashing process (WIPE DATA).")
     parser_info = subparsers.add_parser("info", help="Display AVB info for image files or directories.")
     parser_info.add_argument("files", nargs='+', help="Image file(s) or folder(s) to inspect.")
 
@@ -1779,7 +1808,9 @@ def main():
         elif args.command == "flash_edl":
             flash_edl()
         elif args.command == "patch_all":
-            patch_all()
+            patch_all(wipe=0)
+        elif args.command == "patch_all_wipe":
+            patch_all(wipe=1)
         elif args.command == "info":
             show_image_info(args.files)
     except (subprocess.CalledProcessError, FileNotFoundError, RuntimeError, KeyError) as e:
