@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ltbox.constants import *
-from ltbox import utils, edl
+from ltbox import utils, edl, edit_images, get_kernel_ver, decrypt_x
 
 # --- Core Functions ---
 def patch_boot_with_root():
@@ -73,8 +73,12 @@ def patch_boot_with_root():
         print("[+] Unpack successful.")
 
         print("\n[2/8] Verifying kernel version...")
-        result = utils.run_command([str(PYTHON_EXE), str(GET_KERNEL_VER_PY), "kernel"])
-        target_kernel_version = result.stdout.strip()
+        # Replaced subprocess call with direct import
+        target_kernel_version = get_kernel_ver.get_kernel_version("kernel")
+
+        if not target_kernel_version:
+             print(f"[!] Failed to get kernel version from 'kernel' file.")
+             sys.exit(1)
 
         if not re.match(r"\d+\.\d+\.\d+", target_kernel_version):
              print(f"[!] Invalid kernel version returned from script: '{target_kernel_version}'")
@@ -145,7 +149,8 @@ def convert_images(device_model=None):
         raise
 
     print("--- Starting PRC/ROW Conversion ---")
-    utils.run_command([str(PYTHON_EXE), str(EDIT_IMAGES_PY), "vndrboot", str(vendor_boot_bak)])
+    # Replaced subprocess call with direct import
+    edit_images.edit_vendor_boot(str(vendor_boot_bak))
 
     vendor_boot_prc = BASE_DIR / "vendor_boot_prc.img"
     print("\n[*] Verifying conversion result...")
@@ -354,7 +359,8 @@ def edit_devinfo_persist():
     OUTPUT_DP_DIR.mkdir(exist_ok=True)
 
     print("[*] Running patch script...")
-    utils.run_command([str(PYTHON_EXE), str(EDIT_IMAGES_PY), "dp"])
+    # Replaced subprocess call with direct import
+    edit_images.edit_devinfo_persist()
 
     modified_devinfo = BASE_DIR / "devinfo_modified.img"
     modified_persist = BASE_DIR / "persist_modified.img"
@@ -753,12 +759,7 @@ def clean_workspace():
 
 def modify_xml(wipe=0):
     print("--- Starting XML Modification Process ---")
-
-    if not DECRYPT_PY.exists():
-        print(f"[!] Error: Decryption script not found at '{DECRYPT_PY}'")
-        print("[!] Please ensure 'decrypt_x.py' is in the 'tools' folder.")
-        sys.exit(1)
-        
+    
     print("--- Waiting for 'image' folder ---")
     prompt = (
         "[STEP 1] Please copy the entire 'image' folder from your\n"
@@ -779,9 +780,12 @@ def modify_xml(wipe=0):
     for file in IMAGE_DIR.glob("*.x"):
         out_file = WORKING_DIR / file.with_suffix('.xml').name
         try:
-            utils.run_command([str(PYTHON_EXE), str(DECRYPT_PY), str(file), str(out_file)])
-            print(f"  > Decrypted: {file.name} -> {out_file.name}")
-            xml_files.append(out_file)
+            # Replaced subprocess call with direct import
+            if decrypt_x.decrypt_file(str(file), str(out_file)):
+                print(f"  > Decrypted: {file.name} -> {out_file.name}")
+                xml_files.append(out_file)
+            else:
+                raise Exception(f"Decryption failed for {file.name}")
         except Exception as e:
             print(f"[!] Failed to decrypt {file.name}: {e}", file=sys.stderr)
             
