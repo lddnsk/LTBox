@@ -52,43 +52,6 @@ def get_platform_executable(name):
         raise RuntimeError(f"Unsupported operating system: {system}")
     return TOOLS_DIR / exe_name
 
-# --- ADB Device Handling ---
-def wait_for_adb():
-    print("\n--- WAITING FOR ADB DEVICE ---")
-    print("[!] Please enable USB Debugging on your device, connect it via USB.")
-    print("[!] A 'Allow USB debugging?' prompt will appear on your device.")
-    print("[!] Please check 'Always allow from this computer' and tap 'OK'.")
-    try:
-        run_command([str(ADB_EXE), "wait-for-device"])
-        print("[+] ADB device connected.")
-    except Exception as e:
-        print(f"[!] Error waiting for ADB device: {e}", file=sys.stderr)
-        raise
-
-def get_device_model():
-    print("[*] Getting device model via ADB...")
-    try:
-        result = run_command([str(ADB_EXE), "shell", "getprop", "ro.product.model"], capture=True)
-        model = result.stdout.strip()
-        if not model:
-            print("[!] Could not get device model. Is the device authorized?")
-            return None
-        print(f"[+] Found device model: {model}")
-        return model
-    except Exception as e:
-        print(f"[!] Error getting device model: {e}", file=sys.stderr)
-        print("[!] Please ensure the device is connected and authorized.")
-        return None
-
-def reboot_to_edl():
-    print("[*] Attempting to reboot device to EDL mode via ADB...")
-    try:
-        run_command([str(ADB_EXE), "reboot", "edl"])
-        print("[+] Reboot command sent. Please wait for the device to enter EDL mode.")
-    except Exception as e:
-        print(f"[!] Failed to send reboot command: {e}", file=sys.stderr)
-        print("[!] Please reboot to EDL manually if it fails.")
-
 # --- File/Directory Waiters ---
 def wait_for_files(directory, required_files, prompt_message):
     directory.mkdir(exist_ok=True)
@@ -142,7 +105,7 @@ def wait_for_directory(directory, prompt_message):
         except EOFError:
             sys.exit(1)
 
-# --- Dependency Check & Downloaders ---
+# --- Dependency Check ---
 def check_dependencies():
     print("--- Checking for required files ---")
     dependencies = {
@@ -162,305 +125,6 @@ def check_dependencies():
         sys.exit(1)
 
     print("[+] All dependencies are present.\n")
-
-def _ensure_magiskboot(fetch_exe, magiskboot_exe):
-    if magiskboot_exe.exists():
-        return True
-
-    print(f"[!] '{magiskboot_exe.name}' not found. Attempting to download...")
-    if platform.system() == "Windows":
-        arch = platform.machine()
-        arch_map = {
-            'AMD64': 'x86_64',
-            'ARM64': 'arm64',
-        }
-        target_arch = arch_map.get(arch, 'i686')
-        
-        asset_pattern = f"magiskboot-.*-windows-.*-{target_arch}-standalone\\.zip"
-        
-        print(f"[*] Detected Windows architecture: {arch}. Selecting matching magiskboot binary.")
-        
-        try:
-            fetch_command = [
-                str(fetch_exe),
-                "--repo", MAGISKBOOT_REPO_URL,
-                "--tag", MAGISKBOOT_TAG,
-                "--release-asset", asset_pattern,
-                str(TOOLS_DIR)
-            ]
-            run_command(fetch_command, capture=True)
-
-            downloaded_zips = list(TOOLS_DIR.glob("magiskboot-*-windows-*.zip"))
-            
-            if not downloaded_zips:
-                raise FileNotFoundError("Failed to find the downloaded magiskboot zip archive.")
-            
-            downloaded_zip_path = downloaded_zips[0]
-            
-            with zipfile.ZipFile(downloaded_zip_path, 'r') as zip_ref:
-                magiskboot_info = None
-                for member in zip_ref.infolist():
-                    if member.filename.endswith('magiskboot.exe'):
-                        magiskboot_info = member
-                        break
-                
-                if not magiskboot_info:
-                    raise FileNotFoundError("magiskboot.exe not found inside the downloaded zip archive.")
-
-                zip_ref.extract(magiskboot_info, path=TOOLS_DIR)
-                
-                extracted_path = TOOLS_DIR / magiskboot_info.filename
-                
-                shutil.move(extracted_path, magiskboot_exe)
-                
-                parent_dir = extracted_path.parent
-                if parent_dir.is_dir() and parent_dir != TOOLS_DIR:
-                     try:
-                        parent_dir.rmdir()
-                     except OSError:
-                        shutil.rmtree(parent_dir)
-
-            downloaded_zip_path.unlink()
-            print("[+] Download and extraction successful.")
-            return True
-
-        except (subprocess.CalledProcessError, FileNotFoundError, KeyError, IndexError) as e:
-            print(f"[!] Error downloading or extracting magiskboot: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    else:
-        print(f"[!] Auto-download for {platform.system()} is not supported. Please add it to the 'tools' folder manually.")
-        sys.exit(1)
-
-def _get_gki_kernel(fetch_exe, kernel_version, work_dir):
-    print("\n[3/8] Downloading GKI Kernel with fetch...")
-    asset_pattern = f".*{kernel_version}.*AnyKernel3.zip"
-    fetch_command = [
-        str(fetch_exe), "--repo", REPO_URL, "--tag", RELEASE_TAG,
-        "--release-asset", asset_pattern, str(work_dir)
-    ]
-    run_command(fetch_command)
-
-    downloaded_files = list(work_dir.glob(f"*{kernel_version}*AnyKernel3.zip"))
-    if not downloaded_files:
-        print(f"[!] Failed to download AnyKernel3.zip for kernel {kernel_version}.")
-        sys.exit(1)
-    
-    anykernel_zip = work_dir / ANYKERNEL_ZIP_FILENAME
-    shutil.move(downloaded_files[0], anykernel_zip)
-    print("[+] Download complete.")
-
-    print("\n[4/8] Extracting new kernel image...")
-    extracted_kernel_dir = work_dir / "extracted_kernel"
-    with zipfile.ZipFile(anykernel_zip, 'r') as zip_ref:
-        zip_ref.extractall(extracted_kernel_dir)
-    
-    kernel_image = extracted_kernel_dir / "Image"
-    if not kernel_image.exists():
-        print("[!] 'Image' file not found in the downloaded zip.")
-        sys.exit(1)
-    print("[+] Extraction successful.")
-    return kernel_image
-
-def _download_ksu_apk(fetch_exe, target_dir):
-    print("\n[7/8] Downloading KernelSU Manager APKs...")
-    if list(target_dir.glob("KernelSU*.apk")):
-        print("[+] KernelSU Manager APK already exists. Skipping download.")
-    else:
-        ksu_apk_command = [
-            str(fetch_exe), "--repo", f"https://github.com/{KSU_APK_REPO}", "--tag", KSU_APK_TAG,
-            "--release-asset", ".*\\.apk", str(target_dir)
-        ]
-        run_command(ksu_apk_command)
-        print("[+] KernelSU Manager APKs downloaded to the main directory (if found).")
-
-# --- AVB (Android Verified Boot) Helpers ---
-def extract_image_avb_info(image_path):
-    info_proc = run_command(
-        [str(PYTHON_EXE), str(AVBTOOL_PY), "info_image", "--image", str(image_path)],
-        capture=True
-    )
-    
-    output = info_proc.stdout.strip()
-    info = {}
-    props_args = []
-
-    partition_size_match = re.search(r"^Image size:\s*(\d+)\s*bytes", output, re.MULTILINE)
-    if partition_size_match:
-        info['partition_size'] = partition_size_match.group(1)
-    
-    data_size_match = re.search(r"Original image size:\s*(\d+)\s*bytes", output)
-    if data_size_match:
-        info['data_size'] = data_size_match.group(1)
-    else:
-        desc_size_match = re.search(r"^\s*Image Size:\s*(\d+)\s*bytes", output, re.MULTILINE)
-        if desc_size_match:
-            info['data_size'] = desc_size_match.group(1)
-
-    patterns = {
-        'name': r"Partition Name:\s*(\S+)",
-        'salt': r"Salt:\s*([0-9a-fA-F]+)",
-        'algorithm': r"Algorithm:\s*(\S+)",
-        'pubkey_sha1': r"Public key \(sha1\):\s*([0-9a-fA-F]+)",
-    }
-    
-    header_section = output.split('Descriptors:')[0]
-    rollback_match = re.search(r"Rollback Index:\s*(\d+)", header_section)
-    if rollback_match:
-        info['rollback'] = rollback_match.group(1)
-        
-    flags_match = re.search(r"Flags:\s*(\d+)", header_section)
-    if flags_match:
-        info['flags'] = flags_match.group(1)
-        if output: 
-            print(f"[Info] Parsed Flags: {info['flags']}")
-        
-    for key, pattern in patterns.items():
-        if key not in info:
-            match = re.search(pattern, output)
-            if match:
-                info[key] = match.group(1)
-
-    for line in output.split('\n'):
-        if line.strip().startswith("Prop:"):
-            parts = line.split('->')
-            key = parts[0].split(':')[-1].strip()
-            val = parts[1].strip()[1:-1]
-            info[key] = val
-            props_args.extend(["--prop", f"{key}:{val}"])
-            
-    info['props_args'] = props_args
-    if props_args and output: 
-        print(f"[Info] Parsed {len(props_args) // 2} properties.")
-
-    return info
-
-def _apply_hash_footer(image_path, image_info, key_file, new_rollback_index=None):
-    rollback_index = new_rollback_index if new_rollback_index is not None else image_info['rollback']
-    
-    print(f"\n[*] Adding hash footer to '{image_path.name}'...")
-    print(f"  > Partition: {image_info['name']}, Rollback Index: {rollback_index}")
-
-    add_footer_cmd = [
-        str(PYTHON_EXE), str(AVBTOOL_PY), "add_hash_footer",
-        "--image", str(image_path), 
-        "--key", str(key_file),
-        "--algorithm", image_info['algorithm'], 
-        "--partition_size", image_info['partition_size'],
-        "--partition_name", image_info['name'], 
-        "--rollback_index", str(rollback_index),
-        "--salt", image_info['salt'], 
-        *image_info.get('props_args', [])
-    ]
-    
-    if 'flags' in image_info:
-        add_footer_cmd.extend(["--flags", image_info.get('flags', '0')])
-        print(f"  > Restoring flags: {image_info.get('flags', '0')}")
-
-    run_command(add_footer_cmd)
-    print(f"[+] Successfully applied hash footer to {image_path.name}.")
-
-def patch_chained_image_rollback(image_name, current_rb_index, new_image_path, patched_image_path):
-    try:
-        print(f"[*] Analyzing new {image_name}...")
-        info = extract_image_avb_info(new_image_path)
-        new_rb_index = int(info.get('rollback', '0'))
-        print(f"  > New index: {new_rb_index}")
-
-        if new_rb_index >= current_rb_index:
-            print(f"[*] {image_name} index is OK. Copying as is.")
-            shutil.copy(new_image_path, patched_image_path)
-            return
-
-        print(f"[!] Anti-Rollback Bypassed: Patching {image_name} from {new_rb_index} to {current_rb_index}...")
-        
-        for key in ['partition_size', 'name', 'salt', 'algorithm', 'pubkey_sha1']:
-            if key not in info:
-                raise KeyError(f"Could not find '{key}' in '{new_image_path.name}' AVB info.")
-        
-        key_file = KEY_MAP.get(info['pubkey_sha1']) 
-        if not key_file:
-            raise KeyError(f"Unknown public key SHA1 {info['pubkey_sha1']} in {new_image_path.name}")
-        
-        shutil.copy(new_image_path, patched_image_path)
-        
-        _apply_hash_footer(
-            image_path=patched_image_path,
-            image_info=info,
-            key_file=key_file,
-            new_rollback_index=str(current_rb_index)
-        )
-
-    except (KeyError, subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] Error processing {image_name}: {e}", file=sys.stderr)
-        raise
-
-def patch_vbmeta_image_rollback(image_name, current_rb_index, new_image_path, patched_image_path):
-    try:
-        print(f"[*] Analyzing new {image_name}...")
-        info = extract_image_avb_info(new_image_path)
-        new_rb_index = int(info.get('rollback', '0'))
-        print(f"  > New index: {new_rb_index}")
-
-        if new_rb_index >= current_rb_index:
-            print(f"[*] {image_name} index is OK. Copying as is.")
-            shutil.copy(new_image_path, patched_image_path)
-            return
-
-        print(f"[!] Anti-Rollback Bypassed: Patching {image_name} from {new_rb_index} to {current_rb_index}...")
-
-        for key in ['algorithm', 'pubkey_sha1']:
-            if key not in info:
-                raise KeyError(f"Could not find '{key}' in '{new_image_path.name}' AVB info.")
-        
-        key_file = KEY_MAP.get(info['pubkey_sha1']) 
-        if not key_file:
-            raise KeyError(f"Unknown public key SHA1 {info['pubkey_sha1']} in {new_image_path.name}")
-
-        remake_cmd = [
-            str(PYTHON_EXE), str(AVBTOOL_PY), "make_vbmeta_image",
-            "--output", str(patched_image_path),
-            "--key", str(key_file),
-            "--algorithm", info['algorithm'],
-            "--rollback_index", str(current_rb_index),
-            "--flags", info.get('flags', '0'),
-            "--include_descriptors_from_image", str(new_image_path)
-        ]
-        
-        run_command(remake_cmd)
-        print(f"[+] Successfully patched {image_name}.")
-
-    except (KeyError, subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] Error processing {image_name}: {e}", file=sys.stderr)
-        raise
-
-def process_boot_image(image_to_process):
-    print("\n[*] Verifying boot image key and metadata...") 
-    boot_bak_img = BASE_DIR / "boot.bak.img"
-    if not boot_bak_img.exists():
-        print(f"[!] Backup file '{boot_bak_img.name}' not found. Cannot process image.", file=sys.stderr)
-        raise FileNotFoundError(f"{boot_bak_img.name} not found.")
-        
-    boot_info = extract_image_avb_info(boot_bak_img)
-    
-    for key in ['partition_size', 'name', 'rollback', 'salt', 'algorithm', 'pubkey_sha1']:
-        if key not in boot_info:
-            raise KeyError(f"Could not find '{key}' in '{boot_bak_img.name}' AVB info.")
-            
-    boot_pubkey = boot_info.get('pubkey_sha1')
-    key_file = KEY_MAP.get(boot_pubkey) 
-    
-    if not key_file:
-        print(f"[!] Public key SHA1 '{boot_pubkey}' from boot.img did not match known keys. Cannot add footer.")
-        raise KeyError(f"Unknown boot public key: {boot_pubkey}")
-
-    print(f"[+] Matched {key_file.name}.")
-    
-    _apply_hash_footer(
-        image_path=image_to_process,
-        image_info=boot_info,
-        key_file=key_file
-    )
 
 # --- Info Display ---
 def show_image_info(files):
@@ -516,3 +180,83 @@ def show_image_info(files):
         print(f"[*] Image info saved to: {output_filename}")
     except IOError as e:
         print(f"[!] Error saving info to file: {e}", file=sys.stderr)
+
+def clean_workspace():
+    print("--- Starting Cleanup Process ---")
+    print("This will remove all input/output folders and downloaded tools.")
+    print("The 'python3' and 'backup' folders will NOT be removed.")
+    print("-" * 50)
+
+    folders_to_remove = [
+        INPUT_CURRENT_DIR, INPUT_NEW_DIR,
+        OUTPUT_DIR, OUTPUT_ROOT_DIR, OUTPUT_DP_DIR, OUTPUT_ANTI_ROLLBACK_DIR,
+        WORK_DIR,
+        AVB_DIR,
+        IMAGE_DIR,
+        WORKING_DIR,
+        OUTPUT_XML_DIR,
+        PLATFORM_TOOLS_DIR
+    ]
+    
+    print("[*] Removing directories...")
+    for folder in folders_to_remove:
+        if folder.exists():
+            try:
+                shutil.rmtree(folder)
+                print(f"  > Removed: {folder.name}{os.sep}")
+            except OSError as e:
+                print(f"[!] Error removing {folder.name}: {e}", file=sys.stderr)
+        else:
+            print(f"  > Skipping (not found): {folder.name}{os.sep}")
+
+    print("\n[*] Removing downloaded tools from 'tools' folder...")
+    tools_files_to_remove = [
+        "fetch.exe", "fetch-linux", "fetch-macos",
+        "magiskboot.exe", "magiskboot-linux", "magiskboot-macos",
+        "edl-ng.exe",
+        "magiskboot-*.zip",
+        "edl-ng-*.zip"
+    ]
+    
+    cleaned_tools_files = 0
+    for pattern in tools_files_to_remove:
+        for f in TOOLS_DIR.glob(pattern):
+            try:
+                f.unlink()
+                print(f"  > Removed tool: {f.name}")
+                cleaned_tools_files += 1
+            except OSError as e:
+                print(f"[!] Error removing {f.name}: {e}", file=sys.stderr)
+    
+    if cleaned_tools_files == 0:
+        print("  > No downloaded tools found to clean.")
+
+    print("\n[*] Cleaning up temporary files from root directory...")
+    file_patterns_to_remove = [
+        "*.bak.img",
+        "*.root.img",
+        "*prc.img",
+        "*modified.img",
+        "image_info_*.txt",
+        "KernelSU*.apk",
+        "devinfo.img", 
+        "persist.img", 
+        "boot.img", 
+        "vbmeta.img",
+        "platform-tools.zip"
+    ]
+    
+    cleaned_root_files = 0
+    for pattern in file_patterns_to_remove:
+        for f in BASE_DIR.glob(pattern):
+            try:
+                f.unlink()
+                print(f"  > Removed: {f.name}")
+                cleaned_root_files += 1
+            except OSError as e:
+                print(f"[!] Error removing {f.name}: {e}", file=sys.stderr)
+    
+    if cleaned_root_files == 0:
+        print("  > No temporary files found to clean.")
+
+    print("\n--- Cleanup Finished ---")
