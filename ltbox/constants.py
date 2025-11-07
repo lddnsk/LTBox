@@ -6,6 +6,7 @@ LTBOX_DIR = BASE_DIR / "ltbox"
 TOOLS_DIR = BASE_DIR / "tools"
 PYTHON_DIR = BASE_DIR / "python3"
 AVB_DIR = TOOLS_DIR / "avb"
+PLATFORM_TOOLS_DIR = TOOLS_DIR / "platform-tools"
 
 # --- Output Directories ---
 OUTPUT_DIR = BASE_DIR / "output"
@@ -26,6 +27,7 @@ OUTPUT_XML_DIR = BASE_DIR / "output_xml"
 
 # --- Executable/Script Paths ---
 PYTHON_EXE = PYTHON_DIR / "python.exe"
+ADB_EXE = PLATFORM_TOOLS_DIR / "adb.exe"
 AVBTOOL_PY = AVB_DIR / "avbtool.py"
 EDIT_IMAGES_PY = LTBOX_DIR / "edit_images.py"
 GET_KERNEL_VER_PY = LTBOX_DIR / "get_kernel_ver.py"

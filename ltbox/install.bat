@@ -24,6 +24,11 @@ set "AVB_TOOL_PATH=%AVB_DIR%\avbtool.py"
 set "AVB_ARCHIVE_URL=https://android.googlesource.com/platform/external/avb/+archive/refs/heads/main.tar.gz"
 set "TEMP_ARCHIVE=%TOOLS_DIR%avb_main.tar.gz"
 
+:: Platform-Tools (ADB)
+set "PLATFORM_TOOLS_ZIP_URL=https://dl.google.com/android/repository/platform-tools-latest-windows.zip"
+set "PLATFORM_TOOLS_ZIP_PATH=%BASE_DIR%platform-tools.zip"
+set "ADB_EXE_PATH=%TOOLS_DIR%platform-tools\adb.exe"
+
 :: ======================================================
 :: Create Directories
 :: ======================================================
@@ -76,6 +81,15 @@ if not exist "%AVB_TOOL_PATH%" (
     tar -xzf "%TEMP_ARCHIVE%" -C "%AVB_DIR%" --strip-components=2 test/data/testkey_rsa2048.pem || exit /b 1
     tar -xzf "%TEMP_ARCHIVE%" -C "%AVB_DIR%" --strip-components=2 test/data/testkey_rsa4096.pem || exit /b 1
     del "%TEMP_ARCHIVE%"
+)
+
+:: Check Platform-Tools (ADB)
+if not exist "%ADB_EXE_PATH%" (
+    echo [*] platform-tools ^(adb^) not found. Downloading...
+    curl -L "%PLATFORM_TOOLS_ZIP_URL%" -o "%PLATFORM_TOOLS_ZIP_PATH%" || exit /b 1
+    echo [*] Extracting platform-tools...
+    powershell -Command "Expand-Archive -Path '%PLATFORM_TOOLS_ZIP_PATH%' -DestinationPath '%TOOLS_DIR%' -Force"
+    del "%PLATFORM_TOOLS_ZIP_PATH%"
 )
 
 endlocal

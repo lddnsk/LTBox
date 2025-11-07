@@ -21,5 +21,6 @@ tools/fetch.exe
 tools/kernelsu.ko
 tools/ksuinit
 tools/magiskboot.exe
+tools/platform-tools/
 tools/tmp_patch/
 working/

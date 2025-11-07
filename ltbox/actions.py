@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -109,7 +110,7 @@ def patch_boot_with_root():
         return patched_boot_path
     return None
 
-def convert_images():
+def convert_images(device_model=None):
     utils.check_dependencies()
     
     print("--- Starting vendor_boot & vbmeta conversion process ---") 
@@ -157,6 +158,22 @@ def convert_images():
     vbmeta_info = utils.extract_image_avb_info(vbmeta_bak)
     vendor_boot_info = utils.extract_image_avb_info(vendor_boot_bak)
     print("[+] Information extracted.\n")
+
+    if device_model:
+        print(f"[*] Validating firmware against device model '{device_model}'...")
+        fingerprint_key = "com.android.build.vendor_boot.fingerprint"
+        if fingerprint_key in vendor_boot_info:
+            fingerprint = vendor_boot_info[fingerprint_key]
+            print(f"  > Found firmware fingerprint: {fingerprint}")
+            if device_model in fingerprint:
+                print(f"[+] Success: Device model '{device_model}' found in firmware fingerprint.")
+            else:
+                print(f"[!] ERROR: Device model '{device_model}' NOT found in firmware fingerprint.")
+                print("[!] The provided ROM does not match your device model. Aborting.")
+                raise SystemExit("Firmware model mismatch")
+        else:
+            print(f"[!] Warning: Could not find fingerprint property '{fingerprint_key}' in vendor_boot.")
+            print("[!] Skipping model validation.")
     
     print("--- Adding Hash Footer to vendor_boot ---")
     
@@ -361,6 +378,10 @@ def edit_devinfo_persist():
 
 def read_edl():
     print("--- Starting EDL Read Process ---")
+    
+    utils.reboot_to_edl()
+    print("[*] Waiting for 10 seconds for device to enter EDL mode...")
+    time.sleep(10)
     
     edl_ng_exe = utils._ensure_edl_ng()
     
@@ -711,7 +732,8 @@ def clean_workspace():
         AVB_DIR,
         IMAGE_DIR,
         WORKING_DIR,
-        OUTPUT_XML_DIR
+        OUTPUT_XML_DIR,
+        PLATFORM_TOOLS_DIR
     ]
     
     print("[*] Removing directories...")
@@ -758,7 +780,8 @@ def clean_workspace():
         "devinfo.img", 
         "persist.img", 
         "boot.img", 
-        "vbmeta.img" 
+        "vbmeta.img",
+        "platform-tools.zip"
     ]
     
     cleaned_root_files = 0
@@ -1053,7 +1076,16 @@ def patch_all(wipe=0):
     else:
         print("--- [NO WIPE MODE] Starting Automated Update & Flash ROW ROM Process ---")
     
-    print("\n--- [STEP 1/7] Waiting for RSA Firmware 'image' folder ---")
+    print("\n" + "="*61)
+    print("  STEP 1/8: Waiting for ADB Connection")
+    print("="*61)
+    utils.wait_for_adb()
+    device_model = utils.get_device_model()
+    if not device_model:
+        raise SystemExit("Failed to get device model via ADB.")
+    print("\n--- [STEP 1/8] ADB Device Found SUCCESS ---")
+    
+    print("\n--- [STEP 2/8] Waiting for RSA Firmware 'image' folder ---")
     prompt = (
         "Please copy the entire 'image' folder from your\n"
         "         unpacked Lenovo RSA firmware into the main directory.\n"
@@ -1064,38 +1096,38 @@ def patch_all(wipe=0):
     
     try:
         print("\n" + "="*61)
-        print("  STEP 2/7: Converting ROM (PRC to ROW)")
+        print("  STEP 3/8: Converting ROM (PRC to ROW) & Validating Model")
         print("="*61)
-        convert_images()
-        print("\n--- [STEP 2/7] ROM Conversion SUCCESS ---")
+        convert_images(device_model=device_model)
+        print("\n--- [STEP 3/8] ROM Conversion & Validation SUCCESS ---")
 
         print("\n" + "="*61)
-        print("  STEP 3/7: Modifying XML Files")
+        print("  STEP 4/8: Modifying XML Files")
         print("="*61)
         modify_xml(wipe=wipe)
-        print("\n--- [STEP 3/7] XML Modification SUCCESS ---")
+        print("\n--- [STEP 4/8] XML Modification SUCCESS ---")
         
         print("\n" + "="*61)
-        print("  STEP 4/7: Dumping devinfo/persist for patching")
+        print("  STEP 5/8: Dumping devinfo/persist for patching")
         print("="*61)
         read_edl()
-        print("\n--- [STEP 4/7] Dump SUCCESS ---")
+        print("\n--- [STEP 5/8] Dump SUCCESS ---")
         
         print("\n" + "="*61)
-        print("  STEP 5/7: Patching devinfo/persist")
+        print("  STEP 6/8: Patching devinfo/persist")
         print("="*61)
         edit_devinfo_persist()
-        print("\n--- [STEP 5/7] Patching SUCCESS ---")
+        print("\n--- [STEP 6/8] Patching SUCCESS ---")
         
         print("\n" + "="*61)
-        print("  STEP 6/7: Checking and Patching Anti-Rollback")
+        print("  STEP 7/8: Checking and Patching Anti-Rollback")
         print("="*61)
         read_anti_rollback()
         patch_anti_rollback()
-        print("\n--- [STEP 6/7] Anti-Rollback Check/Patch SUCCESS ---")
+        print("\n--- [STEP 7/8] Anti-Rollback Check/Patch SUCCESS ---")
         
         print("\n" + "="*61)
-        print("  [FINAL STEP] Flashing All Images via EDL")
+        print("  [FINAL STEP 8/8] Flashing All Images via EDL")
         print("="*61)
         print("The device will now be flashed with all modified images.")
         flash_edl(skip_reset_edl=True) 
@@ -1111,9 +1143,9 @@ def patch_all(wipe=0):
         print(f"  Error details: {e}")
         print("!" * 61)
         sys.exit(1)
-    except SystemExit:
+    except SystemExit as e:
         print("\n" + "!" * 61)
-        print("  PROCESS HALTED BY SCRIPT.")
+        print(f"  PROCESS HALTED BY SCRIPT: {e}")
         print("!" * 61)
     except KeyboardInterrupt:
         print("\n" + "!" * 61)

@@ -14,7 +14,7 @@ from ltbox.constants import *
 # --- Process Execution ---
 def run_command(command, shell=False, check=True, env=None, capture=False):
     env = env or os.environ.copy()
-    env['PATH'] = str(TOOLS_DIR) + os.pathsep + env['PATH']
+    env['PATH'] = str(TOOLS_DIR) + os.pathsep + str(PLATFORM_TOOLS_DIR) + os.pathsep + env['PATH']
 
     try:
         process = subprocess.run(
@@ -51,6 +51,43 @@ def get_platform_executable(name):
     if not exe_name:
         raise RuntimeError(f"Unsupported operating system: {system}")
     return TOOLS_DIR / exe_name
+
+# --- ADB Device Handling ---
+def wait_for_adb():
+    print("\n--- WAITING FOR ADB DEVICE ---")
+    print("[!] Please enable USB Debugging on your device, connect it via USB.")
+    print("[!] A 'Allow USB debugging?' prompt will appear on your device.")
+    print("[!] Please check 'Always allow from this computer' and tap 'OK'.")
+    try:
+        run_command([str(ADB_EXE), "wait-for-device"])
+        print("[+] ADB device connected.")
+    except Exception as e:
+        print(f"[!] Error waiting for ADB device: {e}", file=sys.stderr)
+        raise
+
+def get_device_model():
+    print("[*] Getting device model via ADB...")
+    try:
+        result = run_command([str(ADB_EXE), "shell", "getprop", "ro.product.model"], capture=True)
+        model = result.stdout.strip()
+        if not model:
+            print("[!] Could not get device model. Is the device authorized?")
+            return None
+        print(f"[+] Found device model: {model}")
+        return model
+    except Exception as e:
+        print(f"[!] Error getting device model: {e}", file=sys.stderr)
+        print("[!] Please ensure the device is connected and authorized.")
+        return None
+
+def reboot_to_edl():
+    print("[*] Attempting to reboot device to EDL mode via ADB...")
+    try:
+        run_command([str(ADB_EXE), "reboot", "edl"])
+        print("[+] Reboot command sent. Please wait for the device to enter EDL mode.")
+    except Exception as e:
+        print(f"[!] Failed to send reboot command: {e}", file=sys.stderr)
+        print("[!] Please reboot to EDL manually if it fails.")
 
 # --- EDL Device Handling ---
 def check_edl_device(silent=False):
@@ -151,6 +188,7 @@ def check_dependencies():
     print("--- Checking for required files ---")
     dependencies = {
         "Python Environment": PYTHON_EXE,
+        "ADB": ADB_EXE,
         "RSA4096 Key": AVB_DIR / "testkey_rsa4096.pem",
         "RSA2048 Key": AVB_DIR / "testkey_rsa2048.pem",
         "avbtool": AVBTOOL_PY,
