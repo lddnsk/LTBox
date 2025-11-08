@@ -287,14 +287,14 @@ def modify_xml_algo(wipe=0):
             with open(rawprogram_save, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            if wipe == 1:
-                print(f"  > [WIPE] Removing metadata and userdata entries...")
+            if wipe == 0:
+                print(f"  > [NO WIPE] Removing metadata and userdata entries...")
                 for i in range(1, 11):
                     content = content.replace(f'filename="metadata_{i}.img"', '')
                 for i in range(1, 21):
                     content = content.replace(f'filename="userdata_{i}.img"', '')
             else:
-                print(f"  > [NO WIPE] Skipping metadata and userdata removal.")
+                print(f"  > [WIPE] Skipping metadata and userdata removal.")
                 
             with open(rawprogram_save, 'w', encoding='utf-8') as f:
                 f.write(content)
