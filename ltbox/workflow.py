@@ -66,6 +66,23 @@ def patch_all(wipe=0, skip_adb=False):
         actions.read_edl(skip_adb=skip_adb)
         print("\n--- [STEP 6/9] Dump SUCCESS ---")
         
+        print("\n[*] Verifying dumped devinfo and persist images...")
+        devinfo_dump_path = BACKUP_DIR / "devinfo.img"
+        persist_dump_path = BACKUP_DIR / "persist.img"
+
+        if not devinfo_dump_path.exists() or not persist_dump_path.exists():
+            print("\n" + "!" * 61)
+            print("  ERROR: Dump verification failed.")
+            print("  'devinfo.img' or 'persist.img' (or both) are missing")
+            print(f"  from the '{BACKUP_DIR.name}' folder after the dump operation.")
+            print("\n  This often indicates a problem with the")
+            print("  Qualcomm QDLoader 9008 driver or a faulty USB connection.")
+            print("  Please check drivers in Device Manager and try again.")
+            print("!" * 61)
+            raise SystemExit("EDL dump verification failed")
+        
+        print("[+] Dump verification successful.")
+        
         print("\n" + "="*61)
         print("  STEP 7/9: Patching devinfo/persist")
         print("="*61)
