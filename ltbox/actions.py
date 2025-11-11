@@ -1004,21 +1004,7 @@ def flash_edl(skip_reset=False, skip_reset_edl=False, skip_dp=False):
 
     if copied_count == 0:
         print("[*] No 'output*' folders found. Proceeding with files already in 'image' folder.")
-    
-    print("\n[*] Resetting device to EDL to ensure a clean state for fh_loader...")
-    try:
-        device.edl_reset(loader_path, mode="edl")
-        print("[+] Device reset-to-EDL command sent. Waiting 5 seconds for re-enumeration...")
-        time.sleep(5)
-    except Exception as e:
-        print(f"[!] Failed to reset device to EDL: {e}", file=sys.stderr)
-        print("[!] Proceeding anyway, but may fail. If so, reboot to EDL manually.")
-            
-    port = device.wait_for_edl()
-    if not port:
-        print("[!] Failed to find EDL port after reset. Aborting.")
-        raise SystemExit("EDL port not found")
-    
+
     print("\n--- [STEP 1] Flashing all images via rawprogram (fh_loader) ---")
 
     raw_xmls = [f for f in IMAGE_DIR.glob("rawprogram*.xml") if f.name != "rawprogram0.xml"]
