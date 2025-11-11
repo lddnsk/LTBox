@@ -725,7 +725,9 @@ def read_edl_fhloader(skip_adb=False):
 
 
 def write_edl(skip_reset=False, skip_reset_edl=False):
-    print("--- Starting EDL Write Process ---")
+    print("--- Starting Write Process (Fastboot) ---")
+
+    skip_adb = os.environ.get('SKIP_ADB') == '1'
 
     if not OUTPUT_DP_DIR.exists():
         print(f"[!] Error: Patched images folder '{OUTPUT_DP_DIR.name}' not found.", file=sys.stderr)
@@ -733,8 +735,41 @@ def write_edl(skip_reset=False, skip_reset_edl=False):
         raise FileNotFoundError(f"{OUTPUT_DP_DIR.name} not found.")
     print(f"[+] Found patched images folder: '{OUTPUT_DP_DIR.name}'.")
 
-    if not skip_reset_edl:
-        device.setup_edl_connection(skip_adb=False)
+    if not skip_adb:
+        print("[*] checking device state...")
+
+        if device.check_fastboot_device(silent=True):
+            print("[+] Device is already in Fastboot mode.")
+
+        else:
+            edl_port = device.check_edl_device(silent=True)
+            if edl_port:
+                print(f"[!] Device found in EDL mode ({edl_port}).")
+                print("[*] Resetting to System via edl-ng to prepare for Fastboot...")
+                try:
+                    device.edl_reset(EDL_LOADER_FILE)
+                    print("[+] Reset command sent. Waiting for device to boot...")
+                    time.sleep(10)
+                except Exception as e:
+                    print(f"[!] Warning: Failed to reset from EDL: {e}")
+
+            try:
+                device.wait_for_adb(skip_adb=False)
+                device.reboot_to_bootloader(skip_adb=False)
+                time.sleep(10)
+            except Exception as e:
+                print(f"[!] Error requesting reboot to bootloader: {e}")
+                print("[!] Please manually enter Fastboot mode if the script hangs.")
+
+    else:
+        print("\n" + "="*61)
+        print("  [SKIP ADB ACTIVE]")
+        print("  Please manually boot your device into FASTBOOT mode.")
+        print("  (Power + Volume Down usually works)")
+        print("="*61 + "\n")
+        input("  Press Enter when device is in Fastboot mode...")
+
+    device.wait_for_fastboot()
 
     patched_devinfo = OUTPUT_DP_DIR / "devinfo.img"
     patched_persist = OUTPUT_DP_DIR / "persist.img"
@@ -743,47 +778,35 @@ def write_edl(skip_reset=False, skip_reset_edl=False):
          print(f"[!] Error: Neither 'devinfo.img' nor 'persist.img' found inside '{OUTPUT_DP_DIR.name}'.", file=sys.stderr)
          raise FileNotFoundError(f"No patched images found in {OUTPUT_DP_DIR.name}.")
 
-    commands_executed = False
-    
     try:
         if patched_devinfo.exists():
-            print(f"\n[*] Attempting to write 'devinfo' partition with '{patched_devinfo.name}'...")
-            device.edl_write_part(EDL_LOADER_FILE, "devinfo", patched_devinfo)
-            print("[+] Successfully wrote 'devinfo'.")
-            commands_executed = True
+            print(f"\n[*] Flashing 'devinfo' partition via Fastboot...")
+            utils.run_command([str(FASTBOOT_EXE), "flash", "devinfo", str(patched_devinfo)])
+            print("[+] Successfully flashed 'devinfo'.")
         else:
-            print(f"\n[*] 'devinfo.img' not found in '{OUTPUT_DP_DIR.name}'. Skipping write.")
+            print(f"\n[*] 'devinfo.img' not found. Skipping.")
 
         if patched_persist.exists():
-            print(f"\n[*] Attempting to write 'persist' partition with '{patched_persist.name}'...")
-            device.edl_write_part(EDL_LOADER_FILE, "persist", patched_persist)
-            print("[+] Successfully wrote 'persist'.")
-            commands_executed = True
+            print(f"\n[*] Flashing 'persist' partition via Fastboot...")
+            utils.run_command([str(FASTBOOT_EXE), "flash", "persist", str(patched_persist)])
+            print("[+] Successfully flashed 'persist'.")
         else:
-            print(f"\n[*] 'persist.img' not found in '{OUTPUT_DP_DIR.name}'. Skipping write.")
+            print(f"\n[*] 'persist.img' not found. Skipping.")
 
-        if commands_executed and not skip_reset:
-            print("\n[*] Operations complete. Resetting device...")
-            device.edl_reset(EDL_LOADER_FILE)
-            print("[+] Device reset command sent.")
-        elif skip_reset:
-            print("\n[*] Operations complete. Skipping device reset as requested.")
-        else:
-            print("\n[!] No partitions were written. Skipping reset.")
-
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"[!] An error occurred during the EDL write/reset operation: {e}", file=sys.stderr)
+    except subprocess.CalledProcessError as e:
+        print(f"[!] Fastboot flashing failed: {e}", file=sys.stderr)
         raise
 
     if not skip_reset:
-        print("\n" + "="*61)
-        print("  FRIENDLY REMINDER:")
-        print("  Please ensure you have a safe backup of your original")
-        print("  'devinfo.img' and 'persist.img' files before proceeding")
-        print("  with any manual flashing operations.")
-        print("="*61)
+        print("\n[*] Rebooting device...")
+        try:
+            utils.run_command([str(FASTBOOT_EXE), "reboot"])
+        except Exception as e:
+            print(f"[!] Warning: Failed to reboot: {e}")
+    else:
+        print("\n[*] Skipping reboot as requested.")
 
-    print("\n--- EDL Write Process Finished ---")
+    print("\n--- Write Process Finished ---")
 
 def read_anti_rollback(fastboot_output=None):
     print("--- Anti-Rollback Status Check ---")
