@@ -38,7 +38,7 @@ This toolkit provides an all-in-one solution for the following tasks **without u
 
 4.  **Change Region Code:** Patches `devinfo.img` and `persist.img` to change region code.
 
-5.  **Firmware Flashing:** Uses `edl-ng` and `fh_loader` to dump partitions and flash modified firmware packages in Qualcomm Emergency Download (EDL) mode.
+5.  **Firmware Flashing:** Uses `QSaharaServer` and `fh_loader` to dump partitions and flash modified firmware packages in Emergency Download (EDL) mode.
 
 6.  **Automated Process:** Provides fully automated options to perform all the above steps in the correct order, with options for both data wipe and data preservation (no wipe).
 
@@ -48,7 +48,7 @@ The toolkit is now centralized into a single menu-driven script.
 
 1.  **Run the Script:** Double-click **`start.bat`**.
 
-2.  **Install Dependencies (First Run):** The first time you run `start.bat`, it will automatically execute `ltbox\install.bat`. This will download and install all required dependencies (Python, `adb`, `edl-ng`, `avbtool`, `fetch`, etc.) into the `python3/` and `tools/` folders.
+2.  **Install Dependencies (First Run):** The first time you run `start.bat`, it will automatically execute `ltbox\install.bat`. This will download and install all required dependencies (Python, `adb`, `avbtool`, `fetch`, etc.) into the `python3/` and `tools/` folders.
 
 3.  **Select Task:** Choose an option from the menu.
 
@@ -69,7 +69,7 @@ These are the primary, automated functions.
 
 **`1. Install ROW firmware to PRC device (WIPE DATA)`**
 
-The all-in-one automated task. It performs all steps (Convert, XML Modify, Dump, Patch, ARB Check, Flash) and **wipes all user data**.
+The all-in-one automated task. It performs all steps (Convert, XML Prepare, Dump, Patch, ARB Check, Flash) and **wipes all user data**. Supports both encrypted (`.x`) and plain (`.xml`) firmware packages.
 
 **`2. Update ROW firmware on PRC device (NO WIPE)`**
 
@@ -102,7 +102,7 @@ Connect device in EDL mode. Dumps `devinfo` and `persist` to the `backup/` folde
 
 **`3. Patch devinfo/persist to change region code`**
 
-Patches "CNXX" in `devinfo.img`/`persist.img`. It will prompt you to select a new country code from a list. (Input: `backup_critical/`, Output: `output_dp/`).
+Patches "CNXX" or other codes in `devinfo.img`/`persist.img`. It will **always prompt** you to select a new country code from a list. (Input: `backup/`, Output: `output_dp/`).
 
 **`4. Write devinfo/persist to device`**
 
@@ -120,17 +120,20 @@ If a downgrade is detected (by Step 5), this patches the new ROM's images with t
 
 Flashes the ARB-patched images from `output_anti_rollback/` to the device via EDL.
 
-**`8. Convert x files to xml (WIPE DATA)`**
+**`8. Prepare XML files (WIPE DATA)`**
 
-Decrypts `.x` files from `image/` to `.xml` for a **full data wipe**. (Output: `output_xml/`).
+Processes partition tables from `image/` for a **full data wipe**.
+* If `.x` files exist: Decrypts them to `.xml`.
+* If only `.xml` files exist: Moves them to the output folder.
+* Cleans up unnecessary files and ensures critical XMLs exist. (Output: `output_xml/`).
 
-**`9. Convert x files to xml & Modify (NO WIPE)`**
+**`9. Prepare XML files (NO WIPE)`**
 
-Decrypts `.x` files and modifies them to **skip user data partitions**. (Output: `output_xml/`).
+Same as Step 8, but modifies the XMLs to **skip user data partitions** (preserves data). (Output: `output_xml/`).
 
 **`10. Flash firmware to device`**
 
-Manual full flash. This complex step first copies all `output*` folders (`output/`, `output_root/`, `output_anti_rollback/`, `output_xml/`) into `image/` (overwriting). It then flashes `image/` using `fh_loader` (XMLs), and *then* separately flashes patched images from `output_dp/` and `output_anti_rollback/`.
+Manual full flash. This complex step first copies all `output*` folders (`output/`, `output_root/`, `output_anti_rollback/`, `output_xml/`, `output_dp/`) into `image/` (overwriting). It then flashes `image/` using `fh_loader`.
 
 **`11. Clean workspace`**
 
