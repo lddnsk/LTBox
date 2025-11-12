@@ -268,50 +268,64 @@ def patch_boot_with_root_algo(work_dir: Path, magiskboot_exe: Path) -> Optional[
 
 
 def modify_xml_algo(wipe: int = 0) -> None:
-    print("[*] Checking for *.x files to decrypt...")
-    xml_files = []
-    x_files_found = list(IMAGE_DIR.glob("*.x"))
+    def is_garbage_file(path: Path) -> bool:
+        name = path.name.lower()
+        stem = path.stem.lower()
+        if stem == "rawprogram_unsparse0": return True
+        if "wipe_partitions" in name or "blank_gpt" in name: return True
+        return False
 
-    if x_files_found:
-        print(f"[*] Found {len(x_files_found)} .x files. Decrypting to 'working' folder...")
-        for file in x_files_found:
-            out_file = WORKING_DIR / file.with_suffix('.xml').name
+    if OUTPUT_XML_DIR.exists():
+        shutil.rmtree(OUTPUT_XML_DIR)
+    OUTPUT_XML_DIR.mkdir(parents=True, exist_ok=True)
+
+    print("[*] Scanning files in 'image' folder...")
+    
+    x_files = list(IMAGE_DIR.glob("*.x"))
+    xml_files = list(IMAGE_DIR.glob("*.xml"))
+    
+    processed_files = False
+
+    if x_files:
+        print(f"[*] Found {len(x_files)} .x files. Decrypting to '{OUTPUT_XML_DIR.name}'...")
+        for file in x_files:
+            out_file = OUTPUT_XML_DIR / file.with_suffix('.xml').name
             try:
                 if decrypt_file(str(file), str(out_file)):
                     print(f"  > Decrypted: {file.name} -> {out_file.name}")
-                    xml_files.append(out_file)
+                    processed_files = True
                 else:
-                    raise Exception(f"Decryption failed for {file.name}")
+                    print(f"  [!] Decryption failed for {file.name}")
             except Exception as e:
-                print(f"[!] Failed to decrypt {file.name}: {e}", file=sys.stderr)
+                print(f"  [!] Error decrypting {file.name}: {e}", file=sys.stderr)
 
-    if not xml_files:
-        print(f"[*] No decrypted XML files. Checking for plain *.xml files in '{IMAGE_DIR.name}'...")
-        raw_xml_files = list(IMAGE_DIR.glob("*.xml"))
-        
-        if raw_xml_files:
-            print(f"[*] Found {len(raw_xml_files)} .xml files. Copying to 'working' folder...")
-            for file in raw_xml_files:
-                out_file = WORKING_DIR / file.name
-                try:
-                    shutil.copy(str(file), str(out_file))
-                    print(f"  > Copied: {file.name}")
-                    xml_files.append(out_file)
-                except Exception as e:
-                    print(f"[!] Failed to copy {file.name}: {e}", file=sys.stderr)
-        else:
-            print(f"[!] No '*.x' or '*.xml' files found in '{IMAGE_DIR.name}'. Aborting.")
-            shutil.rmtree(WORKING_DIR)
-            raise FileNotFoundError(f"No *.x or *.xml files found in {IMAGE_DIR.name}")
+    if xml_files:
+        print(f"[*] Found {len(xml_files)} .xml files. Moving to '{OUTPUT_XML_DIR.name}'...")
+        for file in xml_files:
+            out_file = OUTPUT_XML_DIR / file.name
+            try:
+                if out_file.exists():
+                    out_file.unlink()
+                shutil.move(str(file), str(out_file))
+                print(f"  > Moved: {file.name}")
+                processed_files = True
+            except Exception as e:
+                print(f"  [!] Error moving {file.name}: {e}", file=sys.stderr)
 
-    rawprogram4 = WORKING_DIR / "rawprogram4.xml"
-    rawprogram_unsparse4 = WORKING_DIR / "rawprogram_unsparse4.xml"
+    if not processed_files:
+        print(f"[!] No usable firmware files (.x or .xml) found in '{IMAGE_DIR.name}'. Aborting.")
+        shutil.rmtree(OUTPUT_XML_DIR)
+        raise FileNotFoundError(f"No .x or .xml files in {IMAGE_DIR.name}")
+
+    rawprogram4 = OUTPUT_XML_DIR / "rawprogram4.xml"
+    rawprogram_unsparse4 = OUTPUT_XML_DIR / "rawprogram_unsparse4.xml"
+    
     if not rawprogram4.exists() and rawprogram_unsparse4.exists():
         print(f"[*] 'rawprogram4.xml' not found. Copying 'rawprogram_unsparse4.xml'...")
         shutil.copy(rawprogram_unsparse4, rawprogram4)
 
-    print("\n[*] Modifying 'rawprogram_save_persist_unsparse0.xml'...")
-    rawprogram_save = WORKING_DIR / "rawprogram_save_persist_unsparse0.xml"
+    print("\n[*] Modifying 'rawprogram_save_persist_unsparse0.xml' (if exists)...")
+    rawprogram_save = OUTPUT_XML_DIR / "rawprogram_save_persist_unsparse0.xml"
     if rawprogram_save.exists():
         try:
             with open(rawprogram_save, 'r', encoding='utf-8') as f:
@@ -328,30 +342,30 @@ def modify_xml_algo(wipe: int = 0) -> None:
                 
             with open(rawprogram_save, 'w', encoding='utf-8') as f:
                 f.write(content)
-            print("  > Patched 'rawprogram_save_persist_unsparse0.xml' successfully.")
+            print("  > Patched successfully.")
         except Exception as e:
-            print(f"[!] Error patching 'rawprogram_save_persist_unsparse0.xml': {e}", file=sys.stderr)
+            print(f"[!] Error patching: {e}", file=sys.stderr)
     else:
-        print("  > 'rawprogram_save_persist_unsparse0.xml' not found. Skipping.")
+        print("  > File not found. Skipping patch.")
 
-    print("\n[*] Deleting unnecessary XML files...")
-    files_to_delete = [
-        WORKING_DIR / "rawprogram_unsparse0.xml",
-        *WORKING_DIR.glob("*_WIPE_PARTITIONS.xml"),
-        *WORKING_DIR.glob("*_BLANK_GPT.xml")
-    ]
-    for f in files_to_delete:
-        if f.exists():
-            f.unlink()
-            print(f"  > Deleted: {f.name}")
+    print("\n[*] Cleaning up unnecessary files in output folder...")
 
-    print(f"\n[*] Moving modified XML files to '{OUTPUT_XML_DIR.name}'...")
-    moved_count = 0
-    for f in WORKING_DIR.glob("*.xml"):
-        shutil.move(str(f), OUTPUT_XML_DIR / f.name)
-        moved_count += 1
-        
-    print(f"[+] Moved {moved_count} modified XML file(s).")
+    files_to_delete = []
+    for f in OUTPUT_XML_DIR.glob("*.xml"):
+        if is_garbage_file(f):
+            files_to_delete.append(f)
+
+    if files_to_delete:
+        for f in files_to_delete:
+            try:
+                f.unlink()
+                print(f"  > Deleted: {f.name}")
+            except OSError as e:
+                print(f"  [!] Failed to delete {f.name}: {e}")
+    else:
+        print("  > No files to delete.")
+
+    print(f"[+] XML processing complete. All files are in '{OUTPUT_XML_DIR.name}'.")
 
 PASSWORD = "OSD"
 
