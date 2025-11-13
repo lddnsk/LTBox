@@ -121,6 +121,7 @@ except ImportError as e:
 COMMAND_MAP = {
     "convert": (actions.convert_images, {}),
     "root_device": (actions.root_device, {"skip_adb": True}),
+    "root_boot_only": (actions.root_boot_only, {}),
     "unroot_device": (actions.unroot_device, {"skip_adb": True}),
     "disable_ota": (actions.disable_ota, {"skip_adb": True}),
     "edit_dp": (actions.edit_devinfo_persist, {}),
@@ -380,6 +381,38 @@ def advanced_menu(skip_adb):
             else:
                 input(get_string("press_enter_to_continue"))
 
+def print_root_menu():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("\n  " + "=" * 58)
+    print(get_string("menu_root_title"))
+    print("  " + "=" * 58 + "\n")
+    print(get_string("menu_root_1"))
+    print(get_string("menu_root_2"))
+    print("\n" + get_string("menu_root_m"))
+    print("\n  " + "=" * 58 + "\n")
+
+def root_menu(skip_adb):
+    actions_map = {
+        "1": ("root_boot_only", get_string("task_title_root_file")),
+        "2": ("root_device", get_string("task_title_root")),
+    }
+
+    while True:
+        print_root_menu()
+        choice = input(get_string("menu_root_prompt")).strip().lower()
+
+        if choice in actions_map:
+            cmd, title = actions_map[choice]
+            run_task(cmd, title, skip_adb)
+        elif choice == "m":
+            return
+        else:
+            print(get_string("menu_root_invalid"))
+            if platform.system() == "Windows":
+                os.system(f"pause > nul & echo {get_string('press_any_key')}...")
+            else:
+                input(get_string("press_enter_to_continue"))
+
 def main():
     skip_adb = False
     
@@ -387,7 +420,6 @@ def main():
         "1": ("patch_all_wipe", get_string("task_title_install_wipe")),
         "2": ("patch_all", get_string("task_title_install_nowipe")),
         "3": ("disable_ota", get_string("task_title_disable_ota")),
-        "4": ("root_device", get_string("task_title_root")),
         "5": ("unroot_device", get_string("task_title_unroot")),
     }
 
@@ -398,6 +430,8 @@ def main():
         if choice in actions_map:
             cmd, title = actions_map[choice]
             run_task(cmd, title, skip_adb)
+        elif choice == "4":
+            root_menu(skip_adb)
         elif choice == "6":
             skip_adb = not skip_adb
         elif choice == "a":
