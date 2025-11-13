@@ -83,6 +83,45 @@ def _ensure_params_or_fail(label: str) -> Dict[str, Any]:
         
     return params
 
+def _detect_active_slot_robust(dev: device.DeviceController, skip_adb: bool) -> Optional[str]:
+    active_slot = None
+
+    if not skip_adb:
+        try:
+            active_slot = dev.get_active_slot_suffix()
+        except Exception:
+            pass
+
+    if not active_slot:
+        print("\n[!] Active slot not detected via ADB. Trying Fastboot...")
+        
+        if not skip_adb:
+            print("[*] Rebooting to Bootloader...")
+            try:
+                dev.reboot_to_bootloader()
+            except Exception as e:
+                print(f"[!] Failed to reboot to bootloader: {e}")
+        else:
+            print("\n" + "="*60)
+            print("  [ACTION REQUIRED] Please manually boot into FASTBOOT mode.")
+            print("="*60 + "\n")
+
+        dev.wait_for_fastboot()
+        active_slot = dev.get_active_slot_suffix_from_fastboot()
+
+        if not skip_adb:
+            print("[*] Slot detected. Rebooting to System to prepare for EDL...")
+            dev.fastboot_reboot_system()
+            print("[*] Waiting for ADB connection...")
+            dev.wait_for_adb()
+        else:
+            print("\n" + "="*60)
+            print("  [ACTION REQUIRED] Detection complete.")
+            print("  [ACTION REQUIRED] Please manually boot your device into EDL mode.")
+            print("="*60 + "\n")
+
+    return active_slot
+
 def convert_images(device_model: Optional[str] = None, skip_adb: bool = False) -> None:
     utils.check_dependencies()
     
@@ -1051,8 +1090,18 @@ def root_device(skip_adb=False):
 
     dev = device.DeviceController(skip_adb=skip_adb)
 
-    print("\n--- [STEP 1/6] Waiting for ADB Connection ---")
-    dev.wait_for_adb()
+    print("\n--- [STEP 1/6] Waiting for ADB Connection & Slot Detection ---")
+    if not skip_adb:
+        dev.wait_for_adb()
+
+    active_slot = _detect_active_slot_robust(dev, skip_adb)
+
+    if active_slot:
+        print(f"[+] Active slot confirmed: {active_slot}")
+        target_partition = f"boot{active_slot}"
+    else:
+        print("[!] Warning: Active slot detection failed. Defaulting to 'boot' (System decides).")
+        target_partition = "boot"
 
     if not skip_adb:
         print("\n[*] Checking & Installing KernelSU Next (Spoofed) APK...")
@@ -1073,13 +1122,14 @@ def root_device(skip_adb=False):
     
     print("\n--- [STEP 2/6] Rebooting to EDL Mode ---")
     port = dev.setup_edl_connection()
+    
     try:
         dev.load_firehose_programmer(EDL_LOADER_FILE, port)
         time.sleep(2)
     except Exception as e:
         print(f"[!] Warning: Programmer loading issue: {e}")
 
-    print("\n--- [STEP 3/6] Dumping boot_a partition ---")
+    print(f"\n--- [STEP 3/6] Dumping {target_partition} partition ---")
     
     params = None
     final_boot_img = OUTPUT_ROOT_DIR / "boot.img"
@@ -1090,7 +1140,7 @@ def root_device(skip_adb=False):
         base_boot_bak = BASE_DIR / "boot.bak.img"
 
         try:
-            params = _ensure_params_or_fail("boot")
+            params = _ensure_params_or_fail(target_partition)
             print(f"  > Found info in {params['source_xml']}: LUN={params['lun']}, Start={params['start_sector']}")
             dev.fh_loader_read_part(
                 port=port,
@@ -1099,9 +1149,9 @@ def root_device(skip_adb=False):
                 start_sector=params['start_sector'],
                 num_sectors=params['num_sectors']
             )
-            print(f"[+] Successfully read 'boot' to '{dumped_boot_img}'.")
+            print(f"[+] Successfully read '{target_partition}' to '{dumped_boot_img}'.")
         except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
-            print(f"[!] Failed to read 'boot': {e}", file=sys.stderr)
+            print(f"[!] Failed to read '{target_partition}': {e}", file=sys.stderr)
             raise
 
         print(f"[*] Backing up original boot.img to '{backup_boot_img.parent.name}' folder...")
@@ -1134,7 +1184,7 @@ def root_device(skip_adb=False):
 
         base_boot_bak.unlink(missing_ok=True)
 
-    print("\n--- [STEP 6/6] Flashing patched boot.img via EDL ---")
+    print(f"\n--- [STEP 6/6] Flashing patched boot.img to {target_partition} via EDL ---")
     
     if not skip_adb:
         print("[*] Waiting for device to boot to System (ADB) to ensure clean state...")
@@ -1153,7 +1203,7 @@ def root_device(skip_adb=False):
         print(f"[!] Warning: Programmer loading issue: {e}")
 
     if not params:
-         params = _ensure_params_or_fail("boot")
+         params = _ensure_params_or_fail(target_partition)
 
     try:
         _fh_loader_write_part(
@@ -1162,7 +1212,7 @@ def root_device(skip_adb=False):
             lun=params['lun'],
             start_sector=params['start_sector']
         )
-        print("[+] Successfully flashed 'boot.img' via EDL.")
+        print(f"[+] Successfully flashed 'boot.img' to {target_partition} via EDL.")
         
         print("\n[*] Resetting to system...")
         dev.fh_loader_reset(port)
@@ -1181,7 +1231,7 @@ def unroot_device(skip_adb=False):
     print("\n--- [STEP 1/4] Checking Requirements ---")
     if not list(IMAGE_DIR.glob("rawprogram*.xml")) and not list(IMAGE_DIR.glob("*.x")):
          print(f"[!] Error: No firmware XMLs found in '{IMAGE_DIR.name}'.")
-         print("[!] Unroot via EDL requires partition info from firmware XMLs.")
+         print("[!] Unroot via EDL requires partition information from firmware XMLs.")
          prompt = (
             "[STEP 1] Please copy the entire 'image' folder from your\n"
             "         unpacked Lenovo RSA firmware into the main directory."
@@ -1200,14 +1250,21 @@ def unroot_device(skip_adb=False):
     print("[+] Stock backup 'boot.img' found.")
 
     dev = device.DeviceController(skip_adb=skip_adb)
+    target_partition = "boot"
 
+    print("\n--- [STEP 3/4] Checking Device Slot & Connection ---")
     if not skip_adb:
-        print("\n[STEP 3/4] Rebooting to EDL Mode...")
         dev.wait_for_adb()
-        port = dev.setup_edl_connection()
+    
+    active_slot = _detect_active_slot_robust(dev, skip_adb)
+    
+    if active_slot:
+        print(f"[+] Active slot confirmed: {active_slot}")
+        target_partition = f"boot{active_slot}"
     else:
-        print("\n[STEP 3/4] Waiting for EDL Connection (Manual)...")
-        port = dev.wait_for_edl()
+        print("[!] Warning: Active slot detection failed. Defaulting to 'boot'.")
+
+    port = dev.setup_edl_connection()
 
     try:
         dev.load_firehose_programmer(EDL_LOADER_FILE, port)
@@ -1215,9 +1272,9 @@ def unroot_device(skip_adb=False):
     except Exception as e:
         print(f"[!] Warning: Programmer loading issue: {e}")
 
-    print("\n--- [STEP 4/4] Flashing stock boot.img via EDL ---")
+    print(f"\n--- [STEP 4/4] Flashing stock boot.img to {target_partition} via EDL ---")
     try:
-        params = _ensure_params_or_fail("boot")
+        params = _ensure_params_or_fail(target_partition)
         print(f"  > Found info in {params['source_xml']}: LUN={params['lun']}, Start={params['start_sector']}")
         
         _fh_loader_write_part(
@@ -1226,7 +1283,7 @@ def unroot_device(skip_adb=False):
             lun=params['lun'],
             start_sector=params['start_sector']
         )
-        print("[+] Successfully flashed stock 'boot.img'.")
+        print(f"[+] Successfully flashed stock 'boot.img' to {target_partition}.")
         
         print("\n[*] Resetting to system...")
         dev.fh_loader_reset(port)
