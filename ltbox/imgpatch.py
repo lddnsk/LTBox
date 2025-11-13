@@ -549,8 +549,12 @@ def _patch_region_code_logic(content: bytes, **kwargs: Any) -> Tuple[bytes, Dict
     if not current_code or not replacement_code:
         return content, {'changed': False, 'message': "Invalid codes"}
 
-    replacement_string = f"000000{replacement_code.upper()}XX000000"
-    replacement_bytes = b'\x00\x00\x00' + f"{replacement_code.upper()}".encode('ascii') + b'XX\x00\x00\x00'
+    if replacement_code == "00":
+        replacement_string = "00000000000000000000"
+        replacement_bytes = b'\x00' * 10
+    else:
+        replacement_string = f"000000{replacement_code.upper()}XX000000"
+        replacement_bytes = b'\x00\x00\x00' + f"{replacement_code.upper()}".encode('ascii') + b'XX\x00\x00\x00'
     
     target_string = f"000000{current_code.upper()}XX000000"
     target_bytes = b'\x00\x00\x00' + f"{current_code.upper()}".encode('ascii') + b'XX\x00\x00\x00'
