@@ -86,7 +86,7 @@ def patch_all(dev: device.DeviceController, wipe: int = 0) -> None:
         
         print(get_string('wf_step6_extra_dumps').format(dumps=', '.join(extra_dumps)))
         
-        dump_status = actions.read_edl_fhloader(
+        dump_status = actions.read_edl(
             dev=dev,
             skip_reset=False, 
             additional_targets=extra_dumps

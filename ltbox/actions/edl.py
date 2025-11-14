@@ -67,9 +67,6 @@ def read_edl(dev: device.DeviceController, skip_reset: bool = False, additional_
     print(get_string("act_dump_finish"))
     print(get_string("act_dump_saved").format(dir=const.BACKUP_DIR.name))
 
-def read_edl_fhloader(dev: device.DeviceController, skip_reset: bool = False, additional_targets: Optional[List[str]] = None) -> None:
-    return read_edl(dev, skip_reset=skip_reset, additional_targets=additional_targets)
-
 def write_edl(dev: device.DeviceController, skip_reset: bool = False, skip_reset_edl: bool = False) -> None:
     print(get_string("act_start_write"))
 

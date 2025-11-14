@@ -5,7 +5,6 @@ from .arb import (
 
 from .edl import (
     read_edl,
-    read_edl_fhloader,
     write_edl,
     write_anti_rollback,
     flash_edl
