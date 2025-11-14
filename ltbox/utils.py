@@ -12,6 +12,16 @@ from typing import List, Optional, Callable, Generator, Any, Union, Dict, Tuple
 from ltbox import constants as const
 from .i18n import get_string
 
+_CACHED_ENV = None
+
+def _get_tool_env() -> dict:
+    global _CACHED_ENV
+    if _CACHED_ENV is None:
+        _CACHED_ENV = os.environ.copy()
+        paths = [str(const.TOOLS_DIR), str(const.DOWNLOAD_DIR)]
+        _CACHED_ENV['PATH'] = os.pathsep.join(paths) + os.pathsep + _CACHED_ENV['PATH']
+    return _CACHED_ENV
+
 def run_command(
     command: Union[List[str], str], 
     shell: bool = False, 
@@ -20,12 +30,11 @@ def run_command(
     capture: bool = False,
     cwd: Optional[Union[str, Path]] = None
 ) -> subprocess.CompletedProcess:
-    env = env or os.environ.copy()
-    env['PATH'] = str(const.TOOLS_DIR) + os.pathsep + str(const.DOWNLOAD_DIR) + os.pathsep + env['PATH']
+    run_env = env if env is not None else _get_tool_env()
 
     return subprocess.run(
         command, shell=shell, check=check, capture_output=capture,
-        text=True, encoding='utf-8', errors='ignore', env=env, cwd=cwd
+        text=True, encoding='utf-8', errors='ignore', env=run_env, cwd=cwd
     )
 
 def get_platform_executable(name: str) -> Path:
