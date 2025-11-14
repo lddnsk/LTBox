@@ -9,14 +9,20 @@ from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime
 
-sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
-
 from ltbox import i18n
 
 APP_DIR = Path(__file__).parent.resolve()
 BASE_DIR = APP_DIR.parent
 PYTHON_EXE = BASE_DIR / "python3" / "python.exe"
 DOWNLOADER_PY = APP_DIR / "downloader.py"
+
+utils = None
+actions = None
+workflow = None
+device = None
+constants = None
+
+COMMAND_MAP = {}
 
 class TeeLogger:
     def __init__(self, original_stream, logger, log_level):
@@ -72,60 +78,7 @@ def setup_console():
         except Exception as e:
             print(f"[!] Warning: Failed to set console title: {e}", file=sys.stderr)
 
-setup_console()
-lang_code = i18n.select_language()
-i18n.load_lang(lang_code)
 from ltbox.i18n import get_string
-
-if platform.system() == "Windows":
-    import ctypes
-
-os.system('cls' if os.name == 'nt' else 'clear')
-print(get_string("dl_base_installing"))
-try:
-    subprocess.run(
-        [str(PYTHON_EXE), str(DOWNLOADER_PY), "install_base_tools", "--lang", lang_code],
-        check=True,
-        encoding='utf-8',
-        errors='ignore'
-    )
-except (subprocess.CalledProcessError, FileNotFoundError) as e:
-    print(f"[!] Critical Error: Failed to install base tools: {e}", file=sys.stderr)
-    print("[!] Please run 'ltbox/install.bat' manually and try again.", file=sys.stderr)
-    if platform.system() == "Windows":
-        os.system("pause")
-    sys.exit(1)
-
-try:
-    from ltbox import utils, actions, workflow, device
-    from ltbox import constants
-except ImportError as e:
-    print(f"[!] Error: Failed to import 'ltbox' package.", file=sys.stderr)
-    print(f"[!] Details: {e}", file=sys.stderr)
-    print(f"[!] Please ensure the 'ltbox' folder and its files are present.", file=sys.stderr)
-    if platform.system() == "Windows":
-        os.system("pause")
-    sys.exit(1)
-
-COMMAND_MAP = {
-    "convert": (actions.convert_images, {}),
-    "root_device": (actions.root_device, {}),
-    "root_boot_only": (actions.root_boot_only, {}),
-    "unroot_device": (actions.unroot_device, {}),
-    "disable_ota": (actions.disable_ota, {}),
-    "edit_dp": (actions.edit_devinfo_persist, {}),
-    "read_edl": (actions.read_edl, {}),
-    "write_edl": (actions.write_edl, {}),
-    "read_anti_rollback": (actions.read_anti_rollback, {}),
-    "patch_anti_rollback": (actions.patch_anti_rollback, {}),
-    "write_anti_rollback": (actions.write_anti_rollback, {}),
-    "clean": (utils.clean_workspace, {}),
-    "modify_xml": (actions.modify_xml, {"wipe": 0}),
-    "modify_xml_wipe": (actions.modify_xml, {"wipe": 1}),
-    "flash_edl": (actions.flash_edl, {}),
-    "patch_all": (workflow.patch_all, {"wipe": 0}),
-    "patch_all_wipe": (workflow.patch_all, {"wipe": 1}),
-}
 
 def check_path_encoding():
     current_path = str(Path(__file__).parent.parent.resolve())
@@ -349,7 +302,7 @@ def root_menu(dev):
             else:
                 input(get_string("press_enter_to_continue"))
 
-def main():
+def main_loop():
     skip_adb = False
     dev = device.DeviceController(skip_adb=skip_adb)
     
@@ -383,10 +336,73 @@ def main():
             else:
                 input(get_string("press_enter_to_continue"))
 
-if __name__ == "__main__":
+def entry_point():
+    global utils, actions, workflow, device, constants, COMMAND_MAP
+    
+    setup_console()
+    
+    is_info_mode = len(sys.argv) > 1 and sys.argv[1].lower() == 'info'
+    
+    if is_info_mode:
+        lang_code = "en"
+    else:
+        lang_code = i18n.select_language()
+        
+    i18n.load_lang(lang_code)
+    
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(get_string("dl_base_installing"))
+    try:
+        subprocess.run(
+            [str(PYTHON_EXE), str(DOWNLOADER_PY), "install_base_tools", "--lang", lang_code],
+            check=True,
+            encoding='utf-8',
+            errors='ignore'
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"[!] Critical Error: Failed to install base tools: {e}", file=sys.stderr)
+        print("[!] Please run 'ltbox/install.bat' manually and try again.", file=sys.stderr)
+        if platform.system() == "Windows":
+            os.system("pause")
+        sys.exit(1)
+
+    try:
+        from ltbox import utils as u, actions as a, workflow as w, device as d
+        from ltbox import constants as c
+        
+        utils, actions, workflow, device, constants = u, a, w, d, c
+        
+        COMMAND_MAP.update({
+            "convert": (actions.convert_images, {}),
+            "root_device": (actions.root_device, {}),
+            "root_boot_only": (actions.root_boot_only, {}),
+            "unroot_device": (actions.unroot_device, {}),
+            "disable_ota": (actions.disable_ota, {}),
+            "edit_dp": (actions.edit_devinfo_persist, {}),
+            "read_edl": (actions.read_edl, {}),
+            "write_edl": (actions.write_edl, {}),
+            "read_anti_rollback": (actions.read_anti_rollback, {}),
+            "patch_anti_rollback": (actions.patch_anti_rollback, {}),
+            "write_anti_rollback": (actions.write_anti_rollback, {}),
+            "clean": (utils.clean_workspace, {}),
+            "modify_xml": (actions.modify_xml, {"wipe": 0}),
+            "modify_xml_wipe": (actions.modify_xml, {"wipe": 1}),
+            "flash_edl": (actions.flash_edl, {}),
+            "patch_all": (workflow.patch_all, {"wipe": 0}),
+            "patch_all_wipe": (workflow.patch_all, {"wipe": 1}),
+        })
+
+    except ImportError as e:
+        print(f"[!] Error: Failed to import 'ltbox' package.", file=sys.stderr)
+        print(f"[!] Details: {e}", file=sys.stderr)
+        print(f"[!] Please ensure the 'ltbox' folder and its files are present.", file=sys.stderr)
+        if platform.system() == "Windows":
+            os.system("pause")
+        sys.exit(1)
+
     check_path_encoding()
     
-    if len(sys.argv) > 1 and sys.argv[1].lower() == 'info':
+    if is_info_mode:
         if len(sys.argv) > 2:
             run_info_scan(sys.argv[2:])
         else:
@@ -396,4 +412,7 @@ if __name__ == "__main__":
         if platform.system() == "Windows":
             os.system("pause")
     else:
-        main()
+        main_loop()
+
+if __name__ == "__main__":
+    entry_point()

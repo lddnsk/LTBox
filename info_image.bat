@@ -3,7 +3,7 @@ chcp 65001 > nul
 setlocal
 
 set "PYTHON_EXE=%~dp0python3\python.exe"
-set "MAIN_PY=%~dp0ltbox\main.py"
+set "MAIN_PY=%~dp0run.py"
 
 if not exist "%PYTHON_EXE%" (
     echo [!] Python not found at: %PYTHON_EXE%
