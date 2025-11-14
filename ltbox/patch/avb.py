@@ -1,70 +1,90 @@
-import re
+import hashlib
+import importlib.util
 import shutil
-import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Any, List
+from typing import Dict, Any, List, Optional
 
-from .. import constants as const
-from .. import utils
-from ..i18n import get_string
+from ltbox import constants as const
+from ltbox import utils
+from ltbox.i18n import get_string
+
+_avbtool_module = None
+
+def _load_avbtool():
+    global _avbtool_module
+    if _avbtool_module:
+        return _avbtool_module
+
+    if not const.AVBTOOL_PY.exists():
+        raise FileNotFoundError(f"avbtool not found at: {const.AVBTOOL_PY}")
+
+    try:
+        spec = importlib.util.spec_from_file_location("avbtool_lib", const.AVBTOOL_PY)
+        if spec and spec.loader:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["avbtool_lib"] = module
+            spec.loader.exec_module(module)
+            _avbtool_module = module
+            return module
+    except Exception as e:
+        raise RuntimeError(f"Failed to load avbtool: {e}")
+    
+    return _avbtool_module
 
 def extract_image_avb_info(image_path: Path) -> Dict[str, Any]:
-    info_proc = utils.run_command(
-        [str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "info_image", "--image", str(image_path)],
-        capture=True
-    )
-    
-    output = info_proc.stdout.strip()
+    image_path = Path(image_path)
     info: Dict[str, Any] = {}
     props_args: List[str] = []
 
-    partition_size_match = re.search(r"^Image size:\s*(\d+)\s*bytes", output, re.MULTILINE)
-    if partition_size_match:
-        info['partition_size'] = partition_size_match.group(1)
+    if not image_path.exists():
+        return info
     
-    data_size_match = re.search(r"Original image size:\s*(\d+)\s*bytes", output)
-    if data_size_match:
-        info['data_size'] = data_size_match.group(1)
-    else:
-        desc_size_match = re.search(r"^\s*Image Size:\s*(\d+)\s*bytes", output, re.MULTILINE)
-        if desc_size_match:
-            info['data_size'] = desc_size_match.group(1)
+    info['partition_size'] = str(image_path.stat().st_size)
 
-    patterns = {
-        'name': r"Partition Name:\s*(\S+)",
-        'salt': r"Salt:\s*([0-9a-fA-F]+)",
-        'algorithm': r"Algorithm:\s*(\S+)",
-        'pubkey_sha1': r"Public key \(sha1\):\s*([0-9a-fA-F]+)",
-    }
-    
-    header_section = output.split('Descriptors:')[0]
-    rollback_match = re.search(r"Rollback Index:\s*(\d+)", header_section)
-    if rollback_match:
-        info['rollback'] = rollback_match.group(1)
+    try:
+        avbtool = _load_avbtool()
+        with open(image_path, 'rb') as f:
+            image_data = f.read()
         
-    flags_match = re.search(r"Flags:\s*(\d+)", header_section)
-    if flags_match:
-        info['flags'] = flags_match.group(1)
-        if output: 
-            print(get_string("img_info_flags").format(flags=info['flags']))
-        
-    for key, pattern in patterns.items():
-        if key not in info:
-            match = re.search(pattern, output)
-            if match:
-                info[key] = match.group(1)
+        avb = avbtool.Avb(image_data)
 
-    for line in output.split('\n'):
-        if line.strip().startswith("Prop:"):
-            parts = line.split('->')
-            key = parts[0].split(':')[-1].strip()
-            val = parts[1].strip()[1:-1]
-            info[key] = val
-            props_args.extend(["--prop", f"{key}:{val}"])
+        if avb.footer:
+            info['data_size'] = str(avb.footer.original_image_size)
+            info['name'] = avb.footer.partition_name
+        
+        if avb.vbmeta_header:
+            info['algorithm'] = avbtool.get_algorithm_name(avb.vbmeta_header.algorithm_type)
+            info['rollback'] = str(avb.vbmeta_header.rollback_index)
+            info['flags'] = str(avb.vbmeta_header.flags)
             
+            if avb.vbmeta_header.public_key_size > 0:
+                key_data = avb.aux_data[:avb.vbmeta_header.public_key_size]
+                info['pubkey_sha1'] = hashlib.sha1(key_data).hexdigest()
+
+        if avb.descriptors:
+            for desc in avb.descriptors:
+                if isinstance(desc, avbtool.AvbPropertyDescriptor):
+                    info[desc.key] = desc.value
+                    props_args.extend(["--prop", f"{desc.key}:{desc.value}"])
+                elif isinstance(desc, avbtool.AvbHashDescriptor):
+                    info['salt'] = desc.salt.hex()
+                    if 'name' not in info:
+                        info['name'] = desc.partition_name
+                elif isinstance(desc, avbtool.AvbHashtreeDescriptor):
+                    info['salt'] = desc.salt.hex()
+                    if 'name' not in info:
+                        info['name'] = desc.partition_name
+
+    except Exception:
+        pass
+
     info['props_args'] = props_args
-    if props_args and output: 
+
+    if 'flags' in info:
+        print(get_string("img_info_flags").format(flags=info['flags']))
+    
+    if props_args:
         print(get_string("img_info_props").format(count=len(props_args) // 2))
 
     return info
