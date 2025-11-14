@@ -159,7 +159,7 @@
   "wf_step8_check_arb": "  STEP 8/9: Checking Anti-Rollback",
   "wf_step8_use_dumps": "[*] Using Dumped Images for ARB Check...",
   "wf_step8_err_arb_check": "  CRITICAL: Anti-Rollback check failed!",
-  "wf_step8_err_arb_check_detail": "  Unable to determine security version.",
+  "wf_step8_err_arb_check_detail": "  Unable to determine rollback indices.",
   "wf_step8_err_arb_abort": "  Aborting to prevent bricking.",
   "wf_step8_complete": "\n--- [STEP 8/9] Anti-Rollback Check Success ---",
   "wf_step9_flash": "  [STEP 9/9] Flashing Images via EDL",
