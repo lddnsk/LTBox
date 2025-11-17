@@ -111,7 +111,7 @@ def patch_chained_image_rollback(
         new_rb_index = int(info.get('rollback', '0'))
         print(get_string("img_new_index").format(index=new_rb_index))
 
-        if new_rb_index >= current_rb_index:
+        if new_rb_index == current_rb_index:
             print(get_string("img_index_ok").format(name=image_name))
             shutil.copy(new_image_path, patched_image_path)
             return
@@ -151,7 +151,7 @@ def patch_vbmeta_image_rollback(
         new_rb_index = int(info.get('rollback', '0'))
         print(get_string("img_new_index").format(index=new_rb_index))
 
-        if new_rb_index >= current_rb_index:
+        if new_rb_index == current_rb_index:
             print(get_string("img_index_ok").format(name=image_name))
             shutil.copy(new_image_path, patched_image_path)
             return
