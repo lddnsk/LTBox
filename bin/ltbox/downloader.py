@@ -288,7 +288,7 @@ def get_kernel_version_from_adb(dev: "device.DeviceController") -> str:
     )
     version_string = result.stdout.strip()
     
-    match = re.search(r"Linux version (\d+\.\d+)", version_string)
+    match = re.search(r"Linux version (\d+\.\d+\.\d+)", version_string)
     if not match:
         raise ToolError(get_string("dl_lkm_kver_fail").format(ver=version_string))
     
