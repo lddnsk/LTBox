@@ -84,7 +84,7 @@ def run_task(command, title, dev, command_map):
             
             no_dev_needed = {
                 "root_boot_only_gki", "root_boot_only_lkm", 
-                "edit_dp", "read_anti_rollback", 
+                "edit_dp", 
                 "patch_anti_rollback", "clean", "modify_xml", "modify_xml_wipe",
                 "decrypt_xml"
             }
@@ -432,8 +432,8 @@ def entry_point():
                 "edit_dp": (a.edit_devinfo_persist, {}),
                 "read_edl": (a.read_edl, {}),
                 "write_edl": (a.write_edl, {}),
-                "read_anti_rollback": (a.read_anti_rollback, {}),
-                "patch_anti_rollback": (a.patch_anti_rollback, {}),
+                "read_anti_rollback": (a.read_anti_rollback_from_device, {}),
+                "patch_anti_rollback": (a.patch_anti_rollback_in_rom, {}),
                 "write_anti_rollback": (a.write_anti_rollback, {}),
                 "clean": (u.clean_workspace, {}),
                 "decrypt_xml": (a.decrypt_x_files, {}),
