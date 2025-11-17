@@ -297,7 +297,7 @@ def flash_edl(dev: device.DeviceController, skip_reset: bool = False, skip_reset
     if not loader_path.exists():
         print(get_string("act_err_loader_missing").format(name=loader_path.name, dir=const.IMAGE_DIR.name))
         print(get_string("act_err_copy_loader"))
-        raise FileNotFoundError(get_string("act_err_loader_missing_exc").format(name=loader_path.name, dir=const.IMAGE_DIR.name))
+        raise FileNotFoundError(get_string("device_err_fh_missing").format(path=loader_path.name, dir=const.IMAGE_DIR.name))
 
     if not skip_reset_edl:
         print("\n" + "="*61)

@@ -219,7 +219,7 @@ def edit_devinfo_persist() -> None:
             print(get_string("act_place_one_file").format(dir=const.BACKUP_DIR.name))
             print(" - devinfo.img")
             print(" - persist.img")
-            print(get_string("act_press_enter"))
+            print(get_string("utils_press_enter"))
             try:
                 input()
             except EOFError:

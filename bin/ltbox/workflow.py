@@ -223,6 +223,6 @@ def patch_all(dev: device.DeviceController, wipe: int = 0) -> None:
         raise
     except KeyboardInterrupt:
         utils.ui.echo("\n" + "!" * 61)
-        utils.ui.echo(get_string('wf_err_cancelled'))
+        utils.ui.echo(get_string('process_cancelled'))
         utils.ui.echo("!" * 61)
         raise

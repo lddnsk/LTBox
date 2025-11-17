@@ -80,5 +80,5 @@ def get_kernel_version(file_path: Union[str, Path]) -> Optional[str]:
             return None
 
     except Exception as e:
-        print(get_string("img_kv_err_unexpected").format(e=e), file=sys.stderr)
+        print(get_string("unexpected_error").format(e=e), file=sys.stderr)
         return None
