@@ -303,7 +303,7 @@
   "img_xml_decrypt_fail": "  [!] Не удалось расшифровать: {name}",
   "img_xml_decrypt_err": "  [!] Ошибка расшифровки {name}: {e}",
   "img_xml_found_xml": "[*] Найдено {count} файлов .xml. Перенос в '{dir}'...",
-  "img_xml_moved": "  > Перенесено: {имя}",
+  "img_xml_moved": "  > Перенесено: {name}",
   "img_xml_move_err": "  [!] Ошибка переноса {name}: {e}",
   "img_xml_no_files": "[!] Нет файлов .x/.xml в '{dir}'. Отмена.",
   "img_xml_copy_raw4": "[*] Отсутствует 'rawprogram4.xml'. Копирование 'rawprogram_unsparse4.xml'...",
@@ -745,3 +745,4 @@
   "img_avb_warn_algo_override": "[!] Предупреждение: алгоритм '{name}' - это '{algo}', а не 'NONE'. Переопределяем на NONE.",
   "img_avb_apply_footer": "[*] Примяем хеш footer для '{name}' с алгоритмом={algo}..."
 }
+
