@@ -62,7 +62,7 @@ KSU_APK_TAG = _get_cfg("kernelsu", "apk_tag")
 RELEASE_OWNER = _get_cfg("kernelsu", "release_owner")
 RELEASE_REPO = _get_cfg("kernelsu", "release_repo")
 RELEASE_TAG = _get_cfg("kernelsu", "release_tag")
-REPO_URL = f"httpsfs://github.com/{RELEASE_OWNER}/{RELEASE_REPO}"
+REPO_URL = f"https://github.com/{RELEASE_OWNER}/{RELEASE_REPO}"
 ANYKERNEL_ZIP_FILENAME = _get_cfg("kernelsu", "anykernel_zip")
 
 EDL_LOADER_FILENAME = _get_cfg("edl", "loader_filename")
