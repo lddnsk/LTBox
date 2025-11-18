@@ -272,6 +272,7 @@ def edit_devinfo_persist() -> None:
         persist_img.unlink(missing_ok=True)
         return
 
+    print(get_string("act_note_region_code"))
     print(get_string("act_ask_change_code"))
     choice = ""
     while choice not in ['y', 'n']:

@@ -181,6 +181,7 @@
   "act_new_vbmeta_idx": "  > New ROM VBMeta Index: {idx}",
   "act_no_codes_skip": "[!] No codes detected. Patching skipped.",
   "act_no_output_folders": "[*] No output folders. Using existing 'image' files.",
+  "act_note_region_code": "You must select the region code that matches your ROM for Play Integrity and Widevine to work correctly.",
   "act_op_cancel": "[*] Operation cancelled.",
   "act_ota_disabled": "[+] Success: OTA service (com.lenovo.ota) disabled.",
   "act_ota_finished": "\n--- Disable OTA Finished ---",

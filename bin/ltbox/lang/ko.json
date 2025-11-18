@@ -181,6 +181,7 @@
   "act_new_vbmeta_idx": "  > 새 ROM VBMeta 인덱스: {idx}",
   "act_no_codes_skip": "[!] 코드 감지되지 않음. 패치 건너뜀",
   "act_no_output_folders": "[*] output 폴더 없음. 기존 'image' 파일 사용",
+  "act_note_region_code": "ROM에 맞는 지역 코드를 선택해야 Play Integrity와 Widevine이 제대로 작동합니다.",
   "act_op_cancel": "[*] 작업 취소됨",
   "act_ota_disabled": "[+] 성공: OTA 서비스 (com.lenovo.ota) 비활성화됨",
   "act_ota_finished": "\n--- OTA 비활성화 완료 ---",
