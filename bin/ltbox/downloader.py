@@ -278,6 +278,89 @@ def download_ksu_apk(target_dir: Path) -> None:
         _run_fetch_command(ksu_apk_command)
         print(get_string("dl_ksu_success"))
 
+def get_kernel_version_from_adb(dev: "device.DeviceController") -> str:
+    from ltbox import device
+    print(get_string("dl_lkm_get_kver"))
+    result = utils.run_command(
+        [str(const.ADB_EXE), "shell", "cat", "/proc/version"],
+        capture=True,
+        check=True
+    )
+    version_string = result.stdout.strip()
+    
+    match = re.search(r"Linux version (\d+\.\d+)", version_string)
+    if not match:
+        raise ToolError(get_string("dl_lkm_kver_fail").format(ver=version_string))
+    
+    kver = match.group(1)
+    print(get_string("dl_lkm_kver_found").format(ver=kver))
+    return kver
+
+def download_ksuinit(target_path: Path) -> None:
+    if target_path.exists():
+        target_path.unlink()
+    
+    url = f"https://github.com/{const.KSU_APK_REPO}/raw/refs/tags/{const.KSU_APK_TAG}/userspace/ksud_magic/bin/aarch64/ksuinit"
+    
+    import requests
+    msg = get_string("dl_downloading").format(filename="ksuinit")
+    print(msg)
+    try:
+        with requests.get(url, stream=True, allow_redirects=True) as response:
+            response.raise_for_status()
+            with open(target_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        msg_success = get_string("dl_download_success").format(filename="ksuinit")
+        print(msg_success)
+        
+        if platform.system() != "Windows":
+            os.chmod(target_path, 0o755)
+    
+    except Exception as e:
+        msg_err = get_string("dl_download_failed").format(url=url, error=e)
+        print(msg_err, file=sys.stderr)
+        if target_path.exists():
+            target_path.unlink()
+        raise ToolError(get_string("dl_err_download_tool").format(name="ksuinit"))
+
+def get_lkm_kernel(dev: "device.DeviceController", target_path: Path, kernel_version_str: Optional[str] = None) -> None:
+    from ltbox import device
+    if target_path.exists():
+        target_path.unlink()
+        
+    kernel_version = kernel_version_str
+    if not kernel_version:
+        kernel_version = get_kernel_version_from_adb(dev)
+    else:
+        print(get_string("dl_lkm_kver_found").format(ver=kernel_version))
+    
+    asset_pattern_regex = f"android.*-{kernel_version}_kernelsu.ko"
+    print(get_string("dl_lkm_downloading").format(asset=asset_pattern_regex))
+    
+    fetch_command = [
+        "--repo", f"https://github.com/{const.KSU_APK_REPO}",
+        "--tag", const.KSU_APK_TAG,
+        "--release-asset", asset_pattern_regex,
+        str(target_path.parent)
+    ]
+    
+    try:
+        _run_fetch_command(fetch_command)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(get_string("dl_lkm_download_fail").format(asset=asset_pattern_regex), file=sys.stderr)
+        print(f"[!] {e}", file=sys.stderr)
+        raise ToolError(get_string("dl_lkm_download_fail").format(asset=asset_pattern_regex))
+    
+    downloaded_files = list(target_path.parent.glob(f"android*-{kernel_version}_kernelsu.ko"))
+    
+    if not downloaded_files:
+        raise ToolError(get_string("dl_lkm_download_fail").format(asset=asset_pattern_regex))
+    
+    downloaded_file = downloaded_files[0]
+    shutil.move(downloaded_file, target_path)
+    print(get_string("dl_lkm_download_ok"))
+
 if __name__ == "__main__":
     lang_code = "en" 
     if "--lang" in sys.argv:

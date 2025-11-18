@@ -84,9 +84,9 @@ def disable_ota(dev: device.DeviceController) -> None:
             print(result.stdout.strip())
         else:
             print(get_string("act_ota_unexpected"))
-            print(f"Stdout: {result.stdout.strip()}")
+            print(get_string("act_ota_stdout").format(output=result.stdout.strip()))
             if result.stderr:
-                print(f"Stderr: {result.stderr.strip()}", file=sys.stderr)
+                print(get_string("act_ota_stderr").format(output=result.stderr.strip()), file=sys.stderr)
     except Exception as e:
         print(get_string("act_err_ota_cmd").format(e=e), file=sys.stderr)
         raise

@@ -1,6 +1,8 @@
 from .arb import (
     read_anti_rollback,
-    patch_anti_rollback
+    patch_anti_rollback,
+    read_anti_rollback_from_device,
+    patch_anti_rollback_in_rom
 )
 
 from .edl import (

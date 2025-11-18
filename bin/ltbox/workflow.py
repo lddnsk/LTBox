@@ -179,7 +179,7 @@ def _flash_images(dev: device.DeviceController, skip_dp_workflow: bool) -> None:
 def _handle_step_error(step_title_key: str, e: Exception) -> None:
     utils.ui.echo("\n" + "!" * 61, err=True)
     utils.ui.echo(get_string('wf_err_halted'), err=True)
-    utils.ui.echo(f"  [!] {get_string(step_title_key)} - FAILED", err=True)
+    utils.ui.echo(get_string('wf_err_step_failed').format(title=get_string(step_title_key)), err=True)
     utils.ui.echo(get_string('wf_err_details').format(e=e), err=True)
     utils.ui.echo("!" * 61, err=True)
     raise e
@@ -223,6 +223,6 @@ def patch_all(dev: device.DeviceController, wipe: int = 0) -> None:
         raise
     except KeyboardInterrupt:
         utils.ui.echo("\n" + "!" * 61)
-        utils.ui.echo(get_string('wf_err_cancelled'))
+        utils.ui.echo(get_string('process_cancelled'))
         utils.ui.echo("!" * 61)
         raise

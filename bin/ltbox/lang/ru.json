@@ -1,5 +1,5 @@
 {
-  "lang_native_name": "Русский (Russian)",
+  "lang_native_name": "Русский",
   "warn_set_console_title": "[!] Предупреждение: Не удалось установить заголовок консоли: {e}",
   "critical_error_path_encoding": "  КРИТИЧЕСКАЯ ОШИБКА: В ПУТИ ОБНАРУЖЕНЫ СИМВОЛЫ, НЕ ОТНОСЯЩИЕСЯ К ASCII",
   "current_path": "  Текущий путь: {current_path}",
@@ -626,11 +626,9 @@
   "act_err_no_xmls": "[!] Ошибка: отсутствуют файлы XML в каталоге '{dir}'.",
   "act_unroot_req_xmls": "[!] Для удаления root прав требуется информация о разделах в XML файлах.",
   "act_unroot_step2": "\n--- [ШАГ 2/4] Проверка наличия резервной копии boot.img ---",
-  "act_prompt_backup_boot": "[!] Резервная копия boot.img отсутствует.\n Поместите исходный boot.img в папку '{dir}'.",
   "act_backup_boot_found": "[+] Найден исходный boot.img.",
   "act_unroot_step3": "\n--- [ШАГ 3/4] Подключение к устройству для определения слота ---",
   "act_warn_unroot_slot": "[!] Слот не обнаружен. Используется по умолчанию ('boot').",
-  "act_unroot_step4": "\n--- [ШАГ 4/4] Прошивка исходного boot.img в раздел {part} ---",
   "act_flash_stock_boot_ok": "[+] Прошивка исходного boot.img в раздел {part}.",
   "act_unroot_finish": "\n--- Удаление root прав завершено ---",
   "img_decrypt_bytes": "байт",
@@ -672,4 +670,5 @@
   "menu_lang_invalid": "    [!] Неверный вариант. Введите цифру от 1 до {len}.",
   "err_load_fallback_lang": "[!] Невозможно загрузить предопределённый языковой пакет en.json: {e}",
   "err_load_lang": "[!] Невозможно загрузить языковой пакет {lang_code}, используется предопределённый: {e}"
+
 }

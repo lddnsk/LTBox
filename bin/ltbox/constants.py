@@ -32,11 +32,13 @@ def _get_cfg(section: str, key: str) -> str:
 
 OUTPUT_DIR = BASE_DIR / "output"
 OUTPUT_ROOT_DIR = BASE_DIR / "output_root"
+OUTPUT_ROOT_LKM_DIR = BASE_DIR / "output_root_lkm"
 OUTPUT_DP_DIR = BASE_DIR / "output_dp"
 BACKUP_DIR = BASE_DIR / "backup"
 WORK_DIR = BASE_DIR / "patch_work"
 
 BACKUP_BOOT_DIR = BASE_DIR / "backup_boot"
+BACKUP_INIT_BOOT_DIR = BASE_DIR / "backup_init_boot"
 WORKING_BOOT_DIR = BASE_DIR / "working_boot"
 
 INPUT_CURRENT_DIR = BASE_DIR / "input_current"
@@ -62,7 +64,7 @@ KSU_APK_TAG = _get_cfg("kernelsu", "apk_tag")
 RELEASE_OWNER = _get_cfg("kernelsu", "release_owner")
 RELEASE_REPO = _get_cfg("kernelsu", "release_repo")
 RELEASE_TAG = _get_cfg("kernelsu", "release_tag")
-REPO_URL = f"https://github.com/{RELEASE_OWNER}/{RELEASE_REPO}"
+REPO_URL = f"httpsfs://github.com/{RELEASE_OWNER}/{RELEASE_REPO}"
 ANYKERNEL_ZIP_FILENAME = _get_cfg("kernelsu", "anykernel_zip")
 
 EDL_LOADER_FILENAME = _get_cfg("edl", "loader_filename")

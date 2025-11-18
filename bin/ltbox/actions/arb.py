@@ -1,12 +1,15 @@
 import shutil
 import sys
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 
 from .. import constants as const
-from .. import utils
+from .. import utils, device
 from ..patch.avb import extract_image_avb_info, patch_chained_image_rollback, patch_vbmeta_image_rollback
 from ..i18n import get_string
+from . import system
+from . import edl
 
 def read_anti_rollback(dumped_boot_path: Path, dumped_vbmeta_path: Path) -> Tuple[str, int, int]:
     print(get_string("act_start_arb"))
@@ -119,3 +122,65 @@ def patch_anti_rollback(comparison_result: Tuple[str, int, int]) -> None:
     except Exception as e:
         print(get_string("act_err_arb_patch").format(e=e), file=sys.stderr)
         shutil.rmtree(const.OUTPUT_ANTI_ROLLBACK_DIR)
+
+def read_anti_rollback_from_device(dev: device.DeviceController) -> None:
+    print(get_string("act_start_arb"))
+    
+    active_slot_suffix = system.detect_active_slot_robust(dev)
+    suffix = active_slot_suffix if active_slot_suffix else ""
+    boot_target = f"boot{suffix}"
+    vbmeta_target = f"vbmeta_system{suffix}"
+    
+    print(get_string('wf_step6_dump'))
+    edl.read_edl(
+        dev=dev,
+        skip_reset=False, 
+        additional_targets=[boot_target, vbmeta_target],
+        default_targets=False
+    )
+    print(get_string('wf_step6_complete'))
+
+    dumped_boot = const.BACKUP_DIR / f"{boot_target}.img"
+    dumped_vbmeta = const.BACKUP_DIR / f"{vbmeta_target}.img"
+
+    if not dumped_boot.exists() or not dumped_vbmeta.exists():
+        print(get_string("act_err_dumped_missing"), file=sys.stderr)
+        raise FileNotFoundError(get_string("act_err_dumped_missing"))
+
+    read_anti_rollback(
+        dumped_boot_path=dumped_boot,
+        dumped_vbmeta_path=dumped_vbmeta
+    )
+
+def patch_anti_rollback_in_rom() -> None:
+    print(get_string("act_start_arb_patch"))
+    
+    backup_dir = const.BACKUP_DIR
+    
+    boot_files = sorted(
+        backup_dir.glob("boot*.img"), 
+        key=os.path.getmtime, 
+        reverse=True
+    )
+    vbmeta_files = sorted(
+        backup_dir.glob("vbmeta_system*.img"), 
+        key=os.path.getmtime, 
+        reverse=True
+    )
+
+    if not boot_files or not vbmeta_files:
+        print(get_string("act_err_dumped_missing"), file=sys.stderr)
+        print(get_string("act_arb_run_detect_first"), file=sys.stderr)
+        raise FileNotFoundError(get_string("act_err_dumped_missing"))
+
+    dumped_boot = boot_files[0]
+    dumped_vbmeta = vbmeta_files[0]
+    
+    print(get_string("act_arb_using_dumped_files").format(boot=dumped_boot.name, vbmeta=dumped_vbmeta.name))
+
+    comparison_result = read_anti_rollback(
+        dumped_boot_path=dumped_boot,
+        dumped_vbmeta_path=dumped_vbmeta
+    )
+
+    patch_anti_rollback(comparison_result=comparison_result)

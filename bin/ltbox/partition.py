@@ -34,7 +34,7 @@ def scan_and_decrypt_xmls() -> List[Path]:
                     else:
                         print(get_string("act_xml_decrypt_fail").format(name=x_file.name))
         else:
-            print(get_string("act_xml_none_found"))
+            print(get_string("img_xml_no_files").format(dir=const.IMAGE_DIR.name))
             print(get_string("act_xml_dump_req"))
             print(get_string("act_xml_place_prompt"))
             return []

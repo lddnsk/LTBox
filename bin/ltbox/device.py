@@ -15,18 +15,23 @@ class DeviceController:
     def __init__(self, skip_adb: bool = False):
         self.skip_adb = skip_adb
         self.edl_port: Optional[str] = None
+        self.adb_connected_once: bool = False
 
     def wait_for_adb(self) -> None:
         if self.skip_adb:
             print(get_string("device_skip_adb"))
             return
-        print(get_string("device_wait_adb_title"))
-        print(get_string("device_enable_usb_debug"))
-        print(get_string("device_usb_prompt_appear"))
-        print(get_string("device_check_always_allow"))
+        
+        if not self.adb_connected_once:
+            print(get_string("device_wait_adb_title"))
+            print(get_string("device_enable_usb_debug"))
+            print(get_string("device_usb_prompt_appear"))
+            print(get_string("device_check_always_allow"))
+        
         try:
             utils.run_command([str(const.ADB_EXE), "wait-for-device"])
             print(get_string("device_adb_connected"))
+            self.adb_connected_once = True
         except Exception as e:
             print(get_string("device_err_wait_adb").format(e=e), file=sys.stderr)
             raise

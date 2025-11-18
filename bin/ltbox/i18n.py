@@ -58,4 +58,9 @@ def get_string(key: str, default: str = "") -> str:
     val = _lang_data.get(key, _fallback_data.get(key, default))
     if val:
         return val
-    return f"[{key}]"
+    
+    missing_key_format = _fallback_data.get("err_missing_key", "[{key}]")
+    try:
+        return missing_key_format.format(key=key)
+    except KeyError:
+        return f"[{key}]"

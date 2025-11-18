@@ -30,7 +30,7 @@ def setup_console():
     if system == "Windows":
         try:
             import ctypes
-            ctypes.windll.kernel32.SetConsoleTitleW(u"LTBox")
+            ctypes.windll.kernel32.SetConsoleTitleW(get_string("app_title"))
         except Exception as e:
             print(get_string("warn_set_console_title").format(e=e), file=sys.stderr)
 
@@ -83,7 +83,8 @@ def run_task(command, title, dev, command_map):
             final_kwargs = base_kwargs.copy()
             
             no_dev_needed = {
-                "root_boot_only", "edit_dp", "read_anti_rollback", 
+                "root_boot_only_gki", "root_boot_only_lkm", 
+                "edit_dp", 
                 "patch_anti_rollback", "clean", "modify_xml", "modify_xml_wipe",
                 "decrypt_xml"
             }
@@ -115,7 +116,7 @@ def run_task(command, title, dev, command_map):
             print(get_string("press_any_key_to_return"))
 
         if platform.system() == "Windows":
-            os.system(f"pause > nul & echo {get_string('press_any_key')}...")
+            os.system(f"pause > nul & echo {get_string('press_any_key')}")
         else:
             input()
 
@@ -141,14 +142,26 @@ def run_info_scan(paths, constants, avb_patch):
 
     with logging_context(log_filename) as logger:
         for f in files_to_scan:
-            header = f"--- Info for: {f.resolve()} ---\n"
+            header = get_string("scan_log_header").format(path=f.resolve())
             logger.info(header)
             print(get_string("scan_scanning_file").format(filename=f.name))
             
             try:
-                info = avb_patch.extract_image_avb_info(f)
-                info_str = json.dumps(info, indent=2)
-                logger.info(info_str)
+                cmd = [
+                    str(constants.PYTHON_EXE), 
+                    str(constants.AVBTOOL_PY), 
+                    "info_image", 
+                    "--image", 
+                    str(f)
+                ]
+                
+                result = avb_patch.utils.run_command(cmd, capture=True, check=False)
+                
+                logger.info(result.stdout.strip())
+                
+                if result.stderr:
+                     logger.info(get_string("scan_log_errors").format(errors=result.stderr.strip()))
+
                 logger.info("\n" + "="*70 + "\n")
             except Exception as e:
                 error_msg = get_string("scan_failed").format(filename=f.name, e=e)
@@ -228,24 +241,62 @@ def advanced_menu(dev, command_map):
             else:
                 input(get_string("press_enter_to_continue"))
 
-def print_root_menu():
+def print_root_mode_selection_menu():
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("\n  " + "=" * 58)
+    print(get_string("menu_root_mode_title"))
+    print("  " + "=" * 58 + "\n")
+    print(get_string("menu_root_mode_1"))
+    print(get_string("menu_root_mode_2"))
+    print("\n" + get_string("menu_root_m"))
+    print("\n  " + "=" * 58 + "\n")
+
+def root_mode_selection_menu(dev, command_map):
+    while True:
+        print_root_mode_selection_menu()
+        choice = input(get_string("menu_root_mode_prompt")).strip().lower()
+
+        if choice == "1":
+            root_menu(dev, command_map, gki=False)
+        elif choice == "2":
+            root_menu(dev, command_map, gki=True)
+        elif choice == "m":
+            return
+        else:
+            print(get_string("menu_root_mode_invalid"))
+            if platform.system() == "Windows":
+                os.system(f"pause > nul & echo {get_string('press_any_key')}...")
+            else:
+                input(get_string("press_enter_to_continue"))
+
+def print_root_menu(gki: bool):
     os.system('cls' if os.name == 'nt' else 'clear')
     print("\n  " + "=" * 58)
     print(get_string("menu_root_title"))
     print("  " + "=" * 58 + "\n")
-    print(get_string("menu_root_1"))
-    print(get_string("menu_root_2"))
+    if gki:
+        print(get_string("menu_root_1_gki"))
+        print(get_string("menu_root_2_gki"))
+    else:
+        print(get_string("menu_root_1_lkm"))
+        print(get_string("menu_root_2_lkm"))
     print("\n" + get_string("menu_root_m"))
     print("\n  " + "=" * 58 + "\n")
 
-def root_menu(dev, command_map):
-    actions_map = {
-        "1": ("root_boot_only", get_string("task_title_root_file")),
-        "2": ("root_device", get_string("task_title_root")),
-    }
+def root_menu(dev, command_map, gki: bool):
+    if gki:
+        actions_map = {
+            "1": ("root_boot_only_gki", get_string("task_title_root_file_gki")),
+            "2": ("root_device_gki", get_string("task_title_root_gki")),
+        }
+    else:
+        actions_map = {
+            "1": ("root_boot_only_lkm", get_string("task_title_root_file_lkm")),
+            "2": ("root_device_lkm", get_string("task_title_root_lkm")),
+        }
 
     while True:
-        print_root_menu()
+        print_root_menu(gki)
         choice = input(get_string("menu_root_prompt")).strip().lower()
 
         if choice in actions_map:
@@ -279,7 +330,7 @@ def main_loop(device_controller_class, command_map):
             cmd, title = actions_map[choice]
             run_task(cmd, title, dev, command_map)
         elif choice == "4":
-            root_menu(dev, command_map)
+            root_mode_selection_menu(dev, command_map)
         elif choice == "6":
             skip_adb = not skip_adb
             dev.skip_adb = skip_adb
@@ -307,7 +358,7 @@ def prompt_for_language() -> str:
             print(get_string("err_no_lang_files"), file=sys.stderr)
             print(get_string("err_no_lang_files_path").format(path=i18n.LANG_DIR), file=sys.stderr)
         else:
-            print(f"Error: {e}", file=sys.stderr)
+            print(get_string("err_lang_generic").format(e=e), file=sys.stderr)
         
         if platform.system() == "Windows":
             os.system("pause")
@@ -372,15 +423,17 @@ def entry_point():
             
             COMMAND_MAP = {
                 "convert": (a.convert_images, {}),
-                "root_device": (a.root_device, {}),
-                "root_boot_only": (a.root_boot_only, {}),
+                "root_device_gki": (a.root_device, {"gki": True}),
+                "root_boot_only_gki": (a.root_boot_only, {"gki": True}),
+                "root_device_lkm": (a.root_device, {"gki": False}),
+                "root_boot_only_lkm": (a.root_boot_only, {"gki": False}),
                 "unroot_device": (a.unroot_device, {}),
                 "disable_ota": (a.disable_ota, {}),
                 "edit_dp": (a.edit_devinfo_persist, {}),
                 "read_edl": (a.read_edl, {}),
                 "write_edl": (a.write_edl, {}),
-                "read_anti_rollback": (a.read_anti_rollback, {}),
-                "patch_anti_rollback": (a.patch_anti_rollback, {}),
+                "read_anti_rollback": (a.read_anti_rollback_from_device, {}),
+                "patch_anti_rollback": (a.patch_anti_rollback_in_rom, {}),
                 "write_anti_rollback": (a.write_anti_rollback, {}),
                 "clean": (u.clean_workspace, {}),
                 "decrypt_xml": (a.decrypt_x_files, {}),
@@ -418,13 +471,13 @@ def entry_point():
             main_loop(device_controller_class, COMMAND_MAP)
 
     except (RuntimeError, ToolError) as e:
-        print(f"\n[!] A fatal error occurred. Aborting.", file=sys.stderr)
-        print(f"[!] Details: {e}", file=sys.stderr)
+        print(get_string("err_fatal_abort"), file=sys.stderr)
+        print(get_string("err_fatal_details").format(e=e), file=sys.stderr)
         if platform.system() == "Windows":
             os.system("pause")
         sys.exit(1)
     except KeyboardInterrupt:
-        print(f"\n[!] Process cancelled by user.", file=sys.stderr)
+        print(get_string("err_fatal_user_cancel"), file=sys.stderr)
         sys.exit(0)
 
 if __name__ == "__main__":

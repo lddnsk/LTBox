@@ -152,10 +152,13 @@ def clean_workspace() -> None:
     folders_to_remove = [
         const.INPUT_CURRENT_DIR, const.INPUT_NEW_DIR,
         const.OUTPUT_DIR, const.OUTPUT_ROOT_DIR, const.OUTPUT_DP_DIR, const.OUTPUT_ANTI_ROLLBACK_DIR,
+        const.OUTPUT_ROOT_LKM_DIR,
         const.WORK_DIR,
         const.IMAGE_DIR,
         const.WORKING_DIR,
         const.OUTPUT_XML_DIR,
+        const.BACKUP_INIT_BOOT_DIR,
+        const.WORKING_BOOT_DIR,
     ]
     
     ui.echo(get_string('utils_removing_dirs'))
@@ -199,7 +202,8 @@ def clean_workspace() -> None:
         "KernelSU*.apk",
         "devinfo.img", 
         "persist.img", 
-        "boot.img", 
+        "boot.img",
+        "init_boot.img",
         "vbmeta.img",
         "platform-tools.zip"
     ]
@@ -239,11 +243,11 @@ def _process_binary_file(
 
         if stats.get('changed', False):
             output_path.write_bytes(modified_content)
-            ui.echo(get_string("img_proc_success").format(msg=stats.get('message', 'Modifications applied.')))
+            ui.echo(get_string("img_proc_success").format(msg=stats.get('message', get_string('img_proc_msg_modified'))))
             ui.echo(get_string("img_proc_saved").format(name=output_path.name))
             return True
         else:
-            ui.echo(get_string("img_proc_no_change").format(name=input_path.name, msg=stats.get('message', 'No patterns found')))
+            ui.echo(get_string("img_proc_no_change").format(name=input_path.name, msg=stats.get('message', get_string('img_proc_msg_no_patterns'))))
             if copy_if_unchanged:
                 ui.echo(get_string("img_proc_copying").format(name=output_path.name))
                 if input_path != output_path:

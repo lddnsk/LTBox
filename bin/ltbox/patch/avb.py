@@ -111,7 +111,7 @@ def patch_chained_image_rollback(
         new_rb_index = int(info.get('rollback', '0'))
         print(get_string("img_new_index").format(index=new_rb_index))
 
-        if new_rb_index >= current_rb_index:
+        if new_rb_index == current_rb_index:
             print(get_string("img_index_ok").format(name=image_name))
             shutil.copy(new_image_path, patched_image_path)
             return
@@ -151,7 +151,7 @@ def patch_vbmeta_image_rollback(
         new_rb_index = int(info.get('rollback', '0'))
         print(get_string("img_new_index").format(index=new_rb_index))
 
-        if new_rb_index >= current_rb_index:
+        if new_rb_index == current_rb_index:
             print(get_string("img_index_ok").format(name=image_name))
             shutil.copy(new_image_path, patched_image_path)
             return
@@ -183,30 +183,78 @@ def patch_vbmeta_image_rollback(
         print(get_string("img_err_processing").format(name=image_name, e=e), file=sys.stderr)
         raise
 
-def process_boot_image_avb(image_to_process: Path) -> None:
-    print(get_string("img_verify_boot")) 
-    boot_bak_img = const.BASE_DIR / "boot.bak.img"
+def process_boot_image_avb(image_to_process: Path, gki: bool = False) -> None:
+    print(get_string("img_verify_boot"))
+    
+    bak_name = "boot.bak.img" if gki else "init_boot.bak.img"
+    boot_bak_img = const.BASE_DIR / bak_name
+    
     if not boot_bak_img.exists():
         print(get_string("img_err_boot_bak_missing").format(name=boot_bak_img.name), file=sys.stderr)
         raise FileNotFoundError(get_string("img_err_boot_bak_missing").format(name=boot_bak_img.name))
         
+    print(get_string("img_avb_extract_info").format(name=boot_bak_img.name))
     boot_info = extract_image_avb_info(boot_bak_img)
     
-    for key in ['partition_size', 'name', 'rollback', 'salt', 'algorithm', 'pubkey_sha1']:
+    required_keys = ['partition_size', 'name', 'rollback', 'salt', 'algorithm']
+    if gki:
+        required_keys.append('pubkey_sha1')
+        
+    for key in required_keys:
         if key not in boot_info:
-            raise KeyError(get_string("img_err_missing_key").format(key=key, name=boot_bak_img.name))
-            
-    boot_pubkey = boot_info.get('pubkey_sha1')
-    key_file = const.KEY_MAP.get(boot_pubkey) 
-    
-    if not key_file:
-        print(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
-        raise KeyError(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
+            if key == 'partition_size' and 'data_size' in boot_info:
+                 boot_info['partition_size'] = boot_info['data_size']
+            else:
+                raise KeyError(get_string("img_err_missing_key").format(key=key, name=boot_bak_img.name))
 
-    print(get_string("img_key_matched").format(name=key_file.name))
-    
-    _apply_hash_footer(
-        image_path=image_to_process,
-        image_info=boot_info,
-        key_file=key_file
-    )
+    try:
+        print(get_string("img_avb_erase_footer").format(name=image_to_process.name))
+        utils.run_command(
+            [str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "erase_footer", "--image", str(image_to_process)],
+            capture=True,
+            check=False
+        )
+        print(get_string("img_avb_erase_footer_ok"))
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(get_string("img_avb_erase_footer_fail").format(e=e))
+            
+    if gki:
+        boot_pubkey = boot_info.get('pubkey_sha1')
+        key_file = const.KEY_MAP.get(boot_pubkey) 
+        
+        if not key_file:
+            key_file_sha1 = "2597c218aae470a130f61162feaae70afd97f011"
+            key_file = const.KEY_MAP.get(key_file_sha1)
+            if not key_file:
+                print(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
+                raise KeyError(get_string("img_err_boot_key_mismatch").format(key=boot_pubkey))
+            else:
+                print(get_string("img_avb_warn_key_fallback").format(key=boot_pubkey, fallback_name=key_file.name))
+
+        print(get_string("img_key_matched").format(name=key_file.name))
+        
+        _apply_hash_footer(
+            image_path=image_to_process,
+            image_info=boot_info,
+            key_file=key_file
+        )
+    else:
+        print(get_string("img_avb_apply_footer").format(name=image_to_process.name, algo=boot_info['algorithm']))
+        
+        add_footer_cmd = [
+            str(const.PYTHON_EXE), str(const.AVBTOOL_PY), "add_hash_footer",
+            "--image", str(image_to_process), 
+            "--algorithm", boot_info['algorithm'],
+            "--partition_size", boot_info['partition_size'],
+            "--partition_name", boot_info['name'], 
+            "--rollback_index", str(boot_info['rollback']),
+            "--salt", boot_info['salt'], 
+            *boot_info.get('props_args', [])
+        ]
+        
+        if 'flags' in boot_info:
+            add_footer_cmd.extend(["--flags", boot_info.get('flags', '0')])
+            print(get_string("img_footer_restore_flags").format(flags=boot_info.get('flags', '0')))
+
+        utils.run_command(add_footer_cmd)
+        print(get_string("img_footer_success").format(name=image_to_process.name))
