@@ -11,9 +11,7 @@ from .. import utils, device
 from ..partition import ensure_params_or_fail
 from ..i18n import get_string
 
-def dump_partitions(dev: device.DeviceController, skip_reset: bool = False, additional_targets: Optional[List[str]] = None, default_targets: bool = True) -> None:
-    print(get_string("act_start_dump"))
-    
+def _prepare_edl_session(dev: device.DeviceController) -> str:
     if not const.EDL_LOADER_FILE.exists():
         print(get_string("act_err_loader_missing").format(name=const.EDL_LOADER_FILE.name, dir=const.IMAGE_DIR.name))
         prompt = get_string("device_loader_prompt").format(loader=const.EDL_LOADER_FILENAME, folder=const.IMAGE_DIR.name)
@@ -30,6 +28,13 @@ def dump_partitions(dev: device.DeviceController, skip_reset: bool = False, addi
         dev.load_firehose_programmer_with_stability(const.EDL_LOADER_FILE, port)
     except Exception as e:
         print(get_string("act_warn_prog_load").format(e=e))
+        
+    return port
+
+def dump_partitions(dev: device.DeviceController, skip_reset: bool = False, additional_targets: Optional[List[str]] = None, default_targets: bool = True) -> None:
+    print(get_string("act_start_dump"))
+    
+    port = _prepare_edl_session(dev)
 
     const.BACKUP_DIR.mkdir(exist_ok=True)
     
@@ -106,22 +111,7 @@ def flash_partitions(dev: device.DeviceController, skip_reset: bool = False, ski
         raise FileNotFoundError(get_string("act_err_dp_folder_nf").format(dir=const.OUTPUT_DP_DIR.name))
     print(get_string("act_found_dp_folder").format(dir=const.OUTPUT_DP_DIR.name))
 
-    if not const.EDL_LOADER_FILE.exists():
-        print(get_string("act_err_loader_missing").format(name=const.EDL_LOADER_FILE.name, dir=const.IMAGE_DIR.name))
-        prompt = get_string("device_loader_prompt").format(loader=const.EDL_LOADER_FILENAME, folder=const.IMAGE_DIR.name)
-        utils.wait_for_files(const.IMAGE_DIR, [const.EDL_LOADER_FILENAME], prompt)
-
-    if not list(const.OUTPUT_XML_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("rawprogram*.xml")) and not list(const.IMAGE_DIR.glob("*.x")):
-         print(get_string("act_err_no_xmls").format(dir=const.IMAGE_DIR.name))
-         prompt = get_string("act_prompt_image")
-         utils.wait_for_directory(const.IMAGE_DIR, prompt)
-
-    port = dev.setup_edl_connection()
-
-    try:
-        dev.load_firehose_programmer_with_stability(const.EDL_LOADER_FILE, port)
-    except Exception as e:
-        print(get_string("act_warn_prog_load").format(e=e))
+    port = _prepare_edl_session(dev)
 
     targets = ["devinfo", "persist"]
 
