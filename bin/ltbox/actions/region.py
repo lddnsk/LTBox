@@ -1,5 +1,4 @@
 import os
-import platform
 import shutil
 import sys
 from datetime import datetime
