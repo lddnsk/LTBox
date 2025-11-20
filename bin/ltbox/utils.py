@@ -19,10 +19,7 @@ class ConsoleUI:
         return input(message)
 
     def clear(self) -> None:
-        if platform.system() == "Windows":
-            os.system('cls')
-        else:
-            os.system('clear')
+        os.system('cls')
 
 ui = ConsoleUI()
 
@@ -52,16 +49,7 @@ def run_command(
     )
 
 def get_platform_executable(name: str) -> Path:
-    system = platform.system()
-    executables = {
-        "Windows": f"{name}.exe",
-        "Linux": f"{name}-linux",
-        "Darwin": f"{name}-macos"
-    }
-    exe_name = executables.get(system)
-    if not exe_name:
-        raise RuntimeError(get_string("err_unsupported_os").format(system=system))
-    return const.DOWNLOAD_DIR / exe_name
+    return const.DOWNLOAD_DIR / f"{name}.exe"
 
 def _wait_for_resource(
     target_path: Path, 

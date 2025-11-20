@@ -311,9 +311,6 @@ def download_ksuinit(target_path: Path) -> None:
                     f.write(chunk)
         msg_success = get_string("dl_download_success").format(filename="ksuinit")
         print(msg_success)
-        
-        if platform.system() != "Windows":
-            os.chmod(target_path, 0o755)
     
     except Exception as e:
         msg_err = get_string("dl_download_failed").format(url=url, error=e)

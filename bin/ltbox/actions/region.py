@@ -210,10 +210,7 @@ def edit_devinfo_persist() -> None:
     if not devinfo_img_src.exists() and not persist_img_src.exists():
         prompt = get_string("act_prompt_dp").format(dir=const.BACKUP_DIR.name)
         while not devinfo_img_src.exists() and not persist_img_src.exists():
-            if platform.system() == "Windows":
-                os.system('cls')
-            else:
-                os.system('clear')
+            os.system('cls')
             print(get_string("act_wait_files_title"))
             print(prompt)
             print(get_string("act_place_one_file").format(dir=const.BACKUP_DIR.name))

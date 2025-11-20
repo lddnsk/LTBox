@@ -40,18 +40,16 @@ def _check_platform():
         sys.exit(1)
 
 def setup_console():
-    system = platform.system()
-    if system == "Windows":
-        try:
-            import ctypes
-            ctypes.windll.kernel32.SetConsoleTitleW(u"LTBox")
-        except Exception as e:
-            print(get_string("warn_set_console_title").format(e=e), file=sys.stderr)
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetConsoleTitleW(u"LTBox")
+    except Exception as e:
+        print(get_string("warn_set_console_title").format(e=e), file=sys.stderr)
 
 def check_path_encoding():
     current_path = str(Path(__file__).parent.parent.resolve())
     if not current_path.isascii():
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('cls')
         print("\n" + "!" * 65)
         print(get_string("critical_error_path_encoding"))
         print("  " + "-" * 60)
@@ -64,14 +62,11 @@ def check_path_encoding():
         print(get_string("example_path"))
         print("!" * 65 + "\n")
         
-        if platform.system() == "Windows":
-            os.system("pause")
-        else:
-            input(get_string("press_enter_to_exit"))
+        os.system("pause")
         raise RuntimeError(get_string("critical_error_path_encoding"))
 
 def run_task(command, title, dev, command_map):
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('cls')
     
     print("  " + "=" * 58)
     print(get_string("starting_task").format(title=title))
@@ -158,10 +153,7 @@ def run_task(command, title, dev, command_map):
         else:
             print(get_string("press_any_key_to_return"))
 
-        if platform.system() == "Windows":
-            os.system(f"pause > nul & echo {get_string('press_any_key')}")
-        else:
-            input()
+        os.system(f"pause > nul & echo {get_string('press_any_key')}")
 
 def run_info_scan(paths, constants, avb_patch):
     print(get_string("scan_start"))
@@ -216,7 +208,7 @@ def run_info_scan(paths, constants, avb_patch):
 
 def print_main_menu(skip_adb):
     skip_adb_state = "ON" if skip_adb else "OFF"
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('cls')
     print("\n  " + "=" * 58)
     print(get_string("menu_main_title"))
     print("  " + "=" * 58 + "\n")
@@ -231,7 +223,7 @@ def print_main_menu(skip_adb):
     print("\n  " + "=" * 58 + "\n")
 
 def print_advanced_menu():
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('cls')
     print("\n  " + "=" * 58)
     print(get_string("menu_adv_title"))
     print("  " + "=" * 58 + "\n")
@@ -279,13 +271,10 @@ def advanced_menu(dev, command_map):
             return
         else:
             print(get_string("menu_adv_invalid"))
-            if platform.system() == "Windows":
-                os.system(f"pause > nul & echo {get_string('press_any_key')}...")
-            else:
-                input(get_string("press_enter_to_continue"))
+            os.system(f"pause > nul & echo {get_string('press_any_key')}...")
 
 def print_root_mode_selection_menu():
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('cls')
     print("\n  " + "=" * 58)
     print(get_string("menu_root_mode_title"))
     print("  " + "=" * 58 + "\n")
@@ -307,13 +296,10 @@ def root_mode_selection_menu(dev, command_map):
             return
         else:
             print(get_string("menu_root_mode_invalid"))
-            if platform.system() == "Windows":
-                os.system(f"pause > nul & echo {get_string('press_any_key')}...")
-            else:
-                input(get_string("press_enter_to_continue"))
+            os.system(f"pause > nul & echo {get_string('press_any_key')}...")
 
 def print_root_menu(gki: bool):
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('cls')
     print("\n  " + "=" * 58)
     print(get_string("menu_root_title"))
     print("  " + "=" * 58 + "\n")
@@ -349,10 +335,7 @@ def root_menu(dev, command_map, gki: bool):
             return
         else:
             print(get_string("menu_root_invalid"))
-            if platform.system() == "Windows":
-                os.system(f"pause > nul & echo {get_string('press_any_key')}...")
-            else:
-                input(get_string("press_enter_to_continue"))
+            os.system(f"pause > nul & echo {get_string('press_any_key')}...")
 
 def main_loop(device_controller_class, command_map):
     skip_adb = False
@@ -383,10 +366,7 @@ def main_loop(device_controller_class, command_map):
             break
         else:
             print(get_string("menu_main_invalid"))
-            if platform.system() == "Windows":
-                os.system(f"pause > nul & echo {get_string('press_any_key')}...")
-            else:
-                input(get_string("press_enter_to_continue"))
+            os.system(f"pause > nul & echo {get_string('press_any_key')}...")
 
 def prompt_for_language() -> str:
     i18n.load_lang("en")
@@ -403,8 +383,7 @@ def prompt_for_language() -> str:
         else:
             print(get_string("err_lang_generic").format(e=e), file=sys.stderr)
         
-        if platform.system() == "Windows":
-            os.system("pause")
+        os.system("pause")
         raise e
 
     menu_options = []
@@ -414,7 +393,7 @@ def prompt_for_language() -> str:
         lang_map[str(i)] = lang_code
         menu_options.append(f"     {i}. {lang_name}")
 
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('cls')
     print("\n  " + "=" * 58)
     print(get_string("menu_lang_title"))
     print("  " + "=" * 58 + "\n")
@@ -444,15 +423,14 @@ def entry_point():
             
         i18n.load_lang(lang_code)
         
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('cls')
 
         try:
             downloader.install_base_tools(lang_code)
         except (subprocess.CalledProcessError, FileNotFoundError, ToolError) as e:
             print(get_string("critical_err_base_tools").format(e=e), file=sys.stderr)
             print(get_string("err_run_install_manually"), file=sys.stderr)
-            if platform.system() == "Windows":
-                os.system("pause")
+            os.system("pause")
             sys.exit(1)
 
         try:
@@ -491,8 +469,7 @@ def entry_point():
             print(get_string("err_import_ltbox"), file=sys.stderr)
             print(get_string("err_details").format(e=e), file=sys.stderr)
             print(get_string("err_ensure_ltbox_present"), file=sys.stderr)
-            if platform.system() == "Windows":
-                os.system("pause")
+            os.system("pause")
             sys.exit(1)
 
         check_path_encoding()
@@ -504,16 +481,14 @@ def entry_point():
                 print(get_string("info_no_files_dragged"), file=sys.stderr)
                 print(get_string("info_drag_files_prompt"), file=sys.stderr)
             
-            if platform.system() == "Windows":
-                os.system("pause")
+            os.system("pause")
         else:
             main_loop(device_controller_class, COMMAND_MAP)
 
     except (RuntimeError, ToolError) as e:
         print(get_string("err_fatal_abort"), file=sys.stderr)
         print(get_string("err_fatal_details").format(e=e), file=sys.stderr)
-        if platform.system() == "Windows":
-            os.system("pause")
+        os.system("pause")
         sys.exit(1)
     except KeyboardInterrupt:
         print(get_string("err_fatal_user_cancel"), file=sys.stderr)

@@ -173,8 +173,6 @@ def root_boot_only(gki: bool = False) -> None:
         if gki:
             magiskboot_exe = utils.get_platform_executable("magiskboot")
             ensure_magiskboot()
-            if platform.system() != "Windows":
-                os.chmod(magiskboot_exe, 0o755)
             patched_boot_path = patch_boot_with_root_algo(const.WORK_DIR, magiskboot_exe, dev=None, gki=True)
         else:
             try:
@@ -543,7 +541,7 @@ def unroot_device(dev: device.DeviceController) -> None:
     unroot_mode: Optional[str] = None
     
     if gki_exists and lkm_exists:
-        os.system('cls' if os.name == 'nt' else 'clear')
+        os.system('cls')
         print("\n  " + "=" * 58)
         print(get_string("act_unroot_menu_title"))
         print("  " + "=" * 58 + "\n")
