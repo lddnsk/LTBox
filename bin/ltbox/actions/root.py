@@ -301,7 +301,7 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
         target_partition = "boot" if gki else "init_boot"
         target_vbmeta_partition = "vbmeta"
 
-    if not dev.skip_adb and gki:
+    if not dev.skip_adb:
         utils.ui.echo(get_string("act_check_ksu"))
         downloader.download_ksu_apk(const.BASE_DIR)
         
