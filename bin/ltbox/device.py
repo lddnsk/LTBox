@@ -341,10 +341,19 @@ class EdlManager:
 
 class DeviceController:
     def __init__(self, skip_adb: bool = False):
-        self.skip_adb = skip_adb
+        self._skip_adb = skip_adb
         self.adb = AdbManager(skip_adb)
         self.fastboot = FastbootManager()
         self.edl = EdlManager()
+
+    @property
+    def skip_adb(self) -> bool:
+        return self._skip_adb
+
+    @skip_adb.setter
+    def skip_adb(self, value: bool) -> None:
+        self._skip_adb = value
+        self.adb.skip_adb = value
 
     def wait_for_adb(self) -> None:
         self.adb.wait_for_device()
