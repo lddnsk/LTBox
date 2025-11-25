@@ -46,11 +46,11 @@ def _patch_lkm_via_app(
         return None
     
     utils.ui.echo(get_string("act_prompt_patch_app"))
-    utils.ui.echo(get_string("utils_press_enter"))
+    utils.ui.echo(get_string("press_enter_to_continue"))
     try:
         utils.ui.prompt()
     except EOFError:
-        raise RuntimeError(get_string('process_cancelled'))
+        raise RuntimeError(get_string('act_op_cancel'))
     
     utils.ui.echo(get_string("act_find_patched_file"))
     try:

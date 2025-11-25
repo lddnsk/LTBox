@@ -215,11 +215,11 @@ def edit_devinfo_persist() -> Optional[str]:
             print(get_string("act_place_one_file").format(dir=const.BACKUP_DIR.name))
             print(get_string("act_dp_list_item").format(filename=const.FN_DEVINFO))
             print(get_string("act_dp_list_item").format(filename=const.FN_PERSIST))
-            print(get_string("utils_press_enter"))
+            print(get_string("press_enter_to_continue"))
             try:
                 input()
             except EOFError:
-                raise RuntimeError(get_string('process_cancelled'))
+                raise RuntimeError(get_string('act_op_cancel'))
 
     if devinfo_img_src.exists():
         shutil.copy(devinfo_img_src, devinfo_img)

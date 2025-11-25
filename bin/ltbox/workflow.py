@@ -41,7 +41,7 @@ def _get_device_info(dev: device.DeviceController) -> Tuple[Optional[str], str]:
     return device_model, active_slot_suffix
 
 def _wait_for_input_images() -> None:
-    prompt = get_string('wf_step3_prompt')
+    prompt = get_string('act_prompt_image')
     utils.wait_for_directory(const.IMAGE_DIR, prompt)
 
 def _convert_region_images(dev: device.DeviceController, device_model: Optional[str]) -> None:
@@ -162,6 +162,6 @@ def patch_all(dev: device.DeviceController, wipe: int = 0, skip_rollback: bool =
     except SystemExit as e:
         raise ToolError(get_string('wf_err_halted_script').format(e=e))
     except KeyboardInterrupt:
-        raise ToolError(get_string('process_cancelled'))
+        raise ToolError(get_string('act_op_cancel'))
     finally:
         utils.ui.info(get_string("logging_finished").format(log_file=log_file))

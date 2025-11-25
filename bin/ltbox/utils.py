@@ -108,11 +108,11 @@ def _wait_for_resource(
                 if not (target_path / item).exists():
                     ui.echo(get_string("utils_missing_item_format").format(item=item))
         
-        ui.echo(get_string('utils_press_enter'))
+        ui.echo(get_string('press_enter_to_continue'))
         try:
             ui.prompt()
         except EOFError:
-            raise RuntimeError(get_string('process_cancelled'))
+            raise RuntimeError(get_string('act_op_cancel'))
 
 def wait_for_files(directory: Path, required_files: List[str], prompt_message: str) -> bool:
     return _wait_for_resource(
