@@ -43,6 +43,12 @@ def setup_console():
     try:
         import ctypes
         ctypes.windll.kernel32.SetConsoleTitleW(u"LTBox")
+
+        sys.stdout.write("\x1b[8;40;80t")
+        sys.stdout.flush()
+
+        os.system("mode con: cols=80 lines=40")
+        
     except Exception as e:
         print(get_string("warn_set_console_title").format(e=e), file=sys.stderr)
 
