@@ -18,24 +18,24 @@ PYTHON_EXE = BASE_DIR / "python3" / "python.exe"
 try:
     from .errors import ToolError
 except ImportError:
-    print(f"[!] Critical Import Error: Failed to import 'ltbox.errors'.", file=sys.stderr)
-    print(f"[!] Please ensure 'ltbox/errors.py' file exists.", file=sys.stderr)
+    print(get_string("err_import_critical"), file=sys.stderr)
+    print(get_string("err_ensure_errors"), file=sys.stderr)
     input(get_string("press_enter_to_exit"))
     sys.exit(1)
 
 def _check_platform():
     if platform.system() != "Windows":
-        print("[!] Fatal Error: This tool is designed to run only on Windows.", file=sys.stderr)
-        print(f"    Current platform detected: {platform.system()}", file=sys.stderr)
-        print("[!] Aborting.", file=sys.stderr)
+        print(get_string("err_fatal_windows"), file=sys.stderr)
+        print(get_string("err_current_platform").format(platform=platform.system()), file=sys.stderr)
+        print(get_string("err_aborting"), file=sys.stderr)
         input(get_string("press_enter_to_exit"))
         sys.exit(1)
     
     if platform.machine() != "AMD64":
-        print("[!] Fatal Error: This tool requires a 64-bit (AMD64) Windows environment.", file=sys.stderr)
-        print(f"    Current architecture detected: {platform.machine()}", file=sys.stderr)
-        print("[!] 32-bit (I386) or ARM64 builds are not supported.", file=sys.stderr)
-        print("[!] Aborting.", file=sys.stderr)
+        print(get_string("err_fatal_amd64"), file=sys.stderr)
+        print(get_string("err_current_arch").format(arch=platform.machine()), file=sys.stderr)
+        print(get_string("err_arch_unsupported"), file=sys.stderr)
+        print(get_string("err_aborting"), file=sys.stderr)
         input(get_string("press_enter_to_exit"))
         sys.exit(1)
 
