@@ -158,3 +158,12 @@ Deletes all `output*`, `work*`, `image`, `output_xml` folders, and temporary fil
 **`info_image.bat`**
 
 Drag and drop `.img` files or folders containing them onto this batch file. It will run `avbtool.py` to get detailed info (partition name, rollback index, AVB properties) and save it to `image_info_[timestamp].txt`.
+
+## 6. Credits
+
+Special thanks to the following community members for their contributions and research:
+
+* **Anonymous [ㅇㅇ](https://gall.dcinside.com/board/lists?id=tabletpc)**: For providing hints on remaking vbmeta by sharing patched files (original posts deleted).
+* **[갓파더](https://ppomppu.co.kr/zboard/view.php?id=androidtab&page=1&divpage=38&no=197457)**: For providing the method to modify the region code in vendor_boot.
+* **[limzei89](https://note.com/limzei89/n/nd5217eb57827)**: For providing the method to modify the country code in devinfo/persist.
+* **[hitin911](https://xdaforums.com/m/hitin911.12861404/)**: For providing the method to decrypt `.x` to `.xml` and modify XML scripts to prevent data loss.

@@ -55,7 +55,8 @@ def dump_partitions(dev: device.DeviceController, skip_reset: bool = False, addi
             utils.ui.echo(get_string("act_found_dump_info").format(xml=params['source_xml'], lun=params['lun'], start=params['start_sector']))
             
             utils.ui.echo(get_string("device_dumping_part").format(lun=params['lun'], start=params['start_sector'], num=params['num_sectors']))
-            dev.edl_write_partition(
+
+            dev.edl_read_partition(
                 port=port,
                 output_filename=str(out_file),
                 lun=params['lun'],
@@ -89,6 +90,10 @@ def dump_partitions(dev: device.DeviceController, skip_reset: bool = False, addi
         utils.ui.echo(get_string("act_wait_stability"))
         time.sleep(5)
 
+    utils.ui.echo(get_string("act_dump_ignore_warn"))
+    utils.ui.echo(get_string("act_dump_finish"))
+    utils.ui.echo(get_string("act_dump_saved").format(dir=const.BACKUP_DIR.name))
+
     if not skip_reset:
         utils.ui.echo(get_string("act_reset_sys"))
         utils.ui.echo(get_string("device_resetting"))
@@ -98,9 +103,6 @@ def dump_partitions(dev: device.DeviceController, skip_reset: bool = False, addi
         time.sleep(10)
     else:
         utils.ui.echo(get_string("act_skip_reset"))
-
-    utils.ui.echo(get_string("act_dump_finish"))
-    utils.ui.echo(get_string("act_dump_saved").format(dir=const.BACKUP_DIR.name))
 
 def flash_partitions(dev: device.DeviceController, skip_reset: bool = False, skip_reset_edl: bool = False) -> None:
     utils.ui.echo(get_string("act_start_write"))

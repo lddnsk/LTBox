@@ -117,10 +117,10 @@ def patch_anti_rollback(comparison_result: Tuple[str, int, int]) -> None:
             patched_image_path=(const.OUTPUT_ANTI_ROLLBACK_DIR / const.FN_VBMETA_SYSTEM)
         )
 
-        utils.ui.echo("\n" + "=" * 61)
+        utils.ui.echo("\n  " + "=" * 78)
         utils.ui.echo(get_string("act_success"))
         utils.ui.echo(get_string("act_arb_patched_ready").format(dir=const.OUTPUT_ANTI_ROLLBACK_DIR.name))
-        utils.ui.echo("=" * 61)
+        utils.ui.echo("  " + "=" * 78)
 
     except Exception as e:
         utils.ui.error(get_string("act_err_arb_patch").format(e=e))
@@ -133,15 +133,13 @@ def read_anti_rollback_from_device(dev: device.DeviceController) -> None:
     suffix = active_slot_suffix if active_slot_suffix else ""
     boot_target = f"boot{suffix}"
     vbmeta_target = f"vbmeta_system{suffix}"
-    
-    utils.ui.echo(get_string('wf_step6_dump'))
+
     edl.dump_partitions(
         dev=dev,
         skip_reset=False, 
         additional_targets=[boot_target, vbmeta_target],
         default_targets=False
     )
-    utils.ui.echo(get_string('wf_step6_complete'))
 
     dumped_boot = const.BACKUP_DIR / f"{boot_target}.img"
     dumped_vbmeta = const.BACKUP_DIR / f"{vbmeta_target}.img"

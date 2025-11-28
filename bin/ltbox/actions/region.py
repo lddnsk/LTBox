@@ -147,10 +147,10 @@ def convert_region_images(dev: device.DeviceController, device_model: Optional[s
         shutil.move(bak_file, const.BACKUP_DIR / bak_file.name)
     print()
 
-    print("=" * 61)
+    print("  " + "=" * 78)
     print(get_string("act_success"))
     print(get_string("act_final_saved").format(dir=const.OUTPUT_DIR.name))
-    print("=" * 61)
+    print("  " + "=" * 78)
 
 def select_country_code(prompt_message: str = "Please select a country from the list below:") -> str:
     print(get_string("act_prompt_msg").format(msg=prompt_message.upper()))
@@ -215,11 +215,11 @@ def edit_devinfo_persist() -> Optional[str]:
             print(get_string("act_place_one_file").format(dir=const.BACKUP_DIR.name))
             print(get_string("act_dp_list_item").format(filename=const.FN_DEVINFO))
             print(get_string("act_dp_list_item").format(filename=const.FN_PERSIST))
-            print(get_string("utils_press_enter"))
+            print(get_string("press_enter_to_continue"))
             try:
                 input()
             except EOFError:
-                raise RuntimeError(get_string('process_cancelled'))
+                raise RuntimeError(get_string('act_op_cancel'))
 
     if devinfo_img_src.exists():
         shutil.copy(devinfo_img_src, devinfo_img)
@@ -303,9 +303,9 @@ def edit_devinfo_persist() -> Optional[str]:
         devinfo_img.unlink(missing_ok=True)
         persist_img.unlink(missing_ok=True)
         
-        print("\n" + "=" * 61)
+        print("\n  " + "=" * 78)
         print(get_string("act_success"))
         print(get_string("act_dp_ready").format(dir=const.OUTPUT_DP_DIR.name))
-        print("=" * 61)
+        print("  " + "=" * 78)
     
     return backup_critical_dir.name

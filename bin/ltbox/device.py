@@ -233,9 +233,9 @@ class EdlManager:
         self.load_programmer(port, loader_path)
         time.sleep(2)
 
-    def write_partition(self, port: str, output_filename: str, lun: str, start_sector: str, num_sectors: str, memory_name: str = "UFS") -> None:
-        if not const.edl_EXE.exists():
-            raise FileNotFoundError(get_string("device_err_fh_missing").format(path=const.edl_EXE))
+    def read_partition(self, port: str, output_filename: str, lun: str, start_sector: str, num_sectors: str, memory_name: str = "UFS") -> None:
+        if not const.EDL_EXE.exists():
+            raise FileNotFoundError(get_string("device_err_fh_missing").format(path=const.EDL_EXE))
 
         dest_file = Path(output_filename).resolve()
         dest_dir = dest_file.parent
@@ -245,7 +245,7 @@ class EdlManager:
 
         port_str = f"\\\\.\\{port}"
         cmd_fh = [
-            str(const.edl_EXE),
+            str(const.EDL_EXE),
             f"--port={port_str}",
             "--convertprogram2read",
             f"--sendimage={dest_filename}",
@@ -263,8 +263,8 @@ class EdlManager:
             raise ToolError(get_string("device_err_fh_exec").format(e=e))
 
     def write_partition(self, port: str, image_path: Path, lun: str, start_sector: str, memory_name: str = "UFS") -> None:
-        if not const.edl_EXE.exists():
-            raise FileNotFoundError(get_string("device_err_fh_missing").format(path=const.edl_EXE))
+        if not const.EDL_EXE.exists():
+            raise FileNotFoundError(get_string("device_err_fh_missing").format(path=const.EDL_EXE))
 
         image_file = Path(image_path).resolve()
         work_dir = image_file.parent
@@ -273,7 +273,7 @@ class EdlManager:
         port_str = f"\\\\.\\{port}"
         
         cmd_fh = [
-            str(const.edl_EXE),
+            str(const.EDL_EXE),
             f"--port={port_str}",
             f"--sendimage={filename}",
             f"--lun={lun}",
@@ -290,13 +290,13 @@ class EdlManager:
             raise ToolError(get_string("device_err_flash_exec").format(e=e))
 
     def reset(self, port: str) -> None:
-        if not const.edl_EXE.exists():
-            raise FileNotFoundError(get_string("device_err_fh_missing").format(path=const.edl_EXE))
+        if not const.EDL_EXE.exists():
+            raise FileNotFoundError(get_string("device_err_fh_missing").format(path=const.EDL_EXE))
             
         port_str = f"\\\\.\\{port}"
         
         cmd_fh = [
-            str(const.edl_EXE),
+            str(const.EDL_EXE),
             f"--port={port_str}",
             "--reset",
             "--noprompt"
@@ -307,7 +307,7 @@ class EdlManager:
             raise ToolError(f"Failed to reset device: {e}")
 
     def flash_rawprogram(self, port: str, loader_path: Path, memory_type: str, raw_xmls: List[Path], patch_xmls: List[Path]) -> None:
-        if not const.QSAHARASERVER_EXE.exists() or not const.edl_EXE.exists():
+        if not const.QSAHARASERVER_EXE.exists() or not const.EDL_EXE.exists():
             ui.error(get_string("device_err_tools_missing").format(dir=const.TOOLS_DIR.name))
             raise FileNotFoundError(get_string("device_err_edl_tools_missing"))
         
@@ -322,7 +322,7 @@ class EdlManager:
         patch_xml_str = ",".join([p.name for p in patch_xmls])
 
         cmd_fh = [
-            str(const.edl_EXE),
+            str(const.EDL_EXE),
             f"--port={port_str}",
             f"--search_path={search_path}",
             f"--sendxml={raw_xml_str}",
@@ -341,10 +341,19 @@ class EdlManager:
 
 class DeviceController:
     def __init__(self, skip_adb: bool = False):
-        self.skip_adb = skip_adb
+        self._skip_adb = skip_adb
         self.adb = AdbManager(skip_adb)
         self.fastboot = FastbootManager()
         self.edl = EdlManager()
+
+    @property
+    def skip_adb(self) -> bool:
+        return self._skip_adb
+
+    @skip_adb.setter
+    def skip_adb(self, value: bool) -> None:
+        self._skip_adb = value
+        self.adb.skip_adb = value
 
     def wait_for_adb(self) -> None:
         self.adb.wait_for_device()
@@ -414,8 +423,8 @@ class DeviceController:
     def load_firehose_programmer_with_stability(self, loader_path: Path, port: str) -> None:
         self.edl.load_programmer_safe(port, loader_path)
 
-    def edl_write_partition(self, port: str, output_filename: str, lun: str, start_sector: str, num_sectors: str, memory_name: str = "UFS") -> None:
-        self.edl.write_partition(port, output_filename, lun, start_sector, num_sectors, memory_name)
+    def edl_read_partition(self, port: str, output_filename: str, lun: str, start_sector: str, num_sectors: str, memory_name: str = "UFS") -> None:
+        self.edl.read_partition(port, output_filename, lun, start_sector, num_sectors, memory_name)
 
     def edl_write_partition(self, port: str, image_path: Path, lun: str, start_sector: str, memory_name: str = "UFS") -> None:
         self.edl.write_partition(port, image_path, lun, start_sector, memory_name)

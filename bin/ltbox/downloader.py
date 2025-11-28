@@ -23,7 +23,7 @@ def download_resource(url: str, dest_path: Path) -> None:
     try:
         with urllib.request.urlopen(url) as response, open(dest_path, 'wb') as f:
             if response.status < 200 or response.status >= 300:
-                 raise HTTPError(url, response.status, f"HTTP Error {response.status}", response.headers, None)
+                 raise HTTPError(url, response.status, get_string("err_http_error").format(code=response.status), response.headers, None)
             shutil.copyfileobj(response, f)
 
         msg_success = get_string("dl_download_success").format(filename=dest_path.name)

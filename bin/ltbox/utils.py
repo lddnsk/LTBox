@@ -18,17 +18,16 @@ class ConsoleUI:
         self.echo(message)
 
     def warn(self, message: str) -> None:
-        self.echo(f"[!] {message}", err=True)
+        self.echo(message, err=True)
 
     def error(self, message: str) -> None:
-        self.echo(f"[!] {message}", err=True)
+        self.echo(message, err=True)
 
     def box_output(self, lines: List[str], err: bool = False) -> None:
-        width = 61
-        self.echo("\n" + "!" * width, err=err)
+        self.echo("", err=err)
         for line in lines:
              self.echo(line, err=err)
-        self.echo("!" * width + "\n", err=err)
+        self.echo("", err=err)
 
     def prompt(self, message: str = "") -> str:
         return input(message)
@@ -108,11 +107,11 @@ def _wait_for_resource(
                 if not (target_path / item).exists():
                     ui.echo(get_string("utils_missing_item_format").format(item=item))
         
-        ui.echo(get_string('utils_press_enter'))
+        ui.echo(get_string('press_enter_to_continue'))
         try:
             ui.prompt()
         except EOFError:
-            raise RuntimeError(get_string('process_cancelled'))
+            raise RuntimeError(get_string('act_op_cancel'))
 
 def wait_for_files(directory: Path, required_files: List[str], prompt_message: str) -> bool:
     return _wait_for_resource(
@@ -169,7 +168,7 @@ def temporary_workspace(path: Path) -> Generator[Path, None, None]:
 def clean_workspace() -> None:
     ui.echo(get_string('utils_cleaning_title'))
     ui.echo(get_string('utils_cleaning_warning'))
-    ui.echo("-" * 50)
+    ui.echo("-" * 78)
 
     folders_to_remove = [
         const.OUTPUT_DIR, const.OUTPUT_ROOT_DIR, const.OUTPUT_DP_DIR, const.OUTPUT_ANTI_ROLLBACK_DIR,

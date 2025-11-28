@@ -46,11 +46,11 @@ def _patch_lkm_via_app(
         return None
     
     utils.ui.echo(get_string("act_prompt_patch_app"))
-    utils.ui.echo(get_string("utils_press_enter"))
+    utils.ui.echo(get_string("press_enter_to_continue"))
     try:
         utils.ui.prompt()
     except EOFError:
-        raise RuntimeError(get_string('process_cancelled'))
+        raise RuntimeError(get_string('act_op_cancel'))
     
     utils.ui.echo(get_string("act_find_patched_file"))
     try:
@@ -230,14 +230,14 @@ def patch_root_image_file(gki: bool = False) -> None:
             shutil.move(bak_file, const.BACKUP_DIR / bak_file.name)
         utils.ui.echo("")
 
-        utils.ui.echo("=" * 61)
+        utils.ui.echo("  " + "=" * 78)
         utils.ui.echo(get_string("act_success"))
         utils.ui.echo(success_msg.format(dir=out_dir_name))
         if not gki:
             utils.ui.echo(get_string("act_root_saved_vbmeta_lkm").format(name=vbmeta_img_name, dir=out_dir_name))
         
         utils.ui.echo("\n" + get_string("act_root_manual_flash_notice"))
-        utils.ui.echo("=" * 61)
+        utils.ui.echo("  " + "=" * 78)
     else:
         utils.ui.error(fail_msg)
 
@@ -301,7 +301,7 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
         target_partition = "boot" if gki else "init_boot"
         target_vbmeta_partition = "vbmeta"
 
-    if not dev.skip_adb and gki:
+    if not dev.skip_adb:
         utils.ui.echo(get_string("act_check_ksu"))
         downloader.download_ksu_apk(const.BASE_DIR)
         
@@ -348,7 +348,7 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
         try:
             params = ensure_params_or_fail(target_partition)
             utils.ui.echo(get_string("act_found_dump_info").format(xml=params['source_xml'], lun=params['lun'], start=params['start_sector']))
-            dev.edl_write_partition(
+            dev.edl_read_partition(
                 port=port,
                 output_filename=str(dumped_boot_img),
                 lun=params['lun'],
@@ -359,7 +359,7 @@ def root_device(dev: device.DeviceController, gki: bool = False) -> None:
             if not gki:
                 params_vbmeta = ensure_params_or_fail(target_vbmeta_partition)
                 utils.ui.echo(get_string("act_found_dump_info").format(xml=params_vbmeta['source_xml'], lun=params_vbmeta['lun'], start=params_vbmeta['start_sector']))
-                dev.edl_write_partition(
+                dev.edl_read_partition(
                     port=port,
                     output_filename=str(dumped_vbmeta_img),
                     lun=params_vbmeta['lun'],
@@ -543,13 +543,13 @@ def unroot_device(dev: device.DeviceController) -> None:
     
     if gki_exists and lkm_exists:
         os.system('cls')
-        utils.ui.echo("\n  " + "=" * 58)
+        utils.ui.echo("\n  " + "=" * 78)
         utils.ui.echo(get_string("act_unroot_menu_title"))
-        utils.ui.echo("  " + "=" * 58 + "\n")
+        utils.ui.echo("  " + "=" * 78 + "\n")
         utils.ui.echo(get_string("act_unroot_menu_1_lkm"))
         utils.ui.echo(get_string("act_unroot_menu_2_gki"))
         utils.ui.echo("\n" + get_string("act_unroot_menu_m"))
-        utils.ui.echo("\n  " + "=" * 58 + "\n")
+        utils.ui.echo("\n  " + "=" * 78 + "\n")
         
         while unroot_mode is None:
             choice = utils.ui.prompt(get_string("act_unroot_menu_prompt")).strip().lower()

@@ -18,24 +18,24 @@ PYTHON_EXE = BASE_DIR / "python3" / "python.exe"
 try:
     from .errors import ToolError
 except ImportError:
-    print(f"[!] Critical Import Error: Failed to import 'ltbox.errors'.", file=sys.stderr)
-    print(f"[!] Please ensure 'ltbox/errors.py' file exists.", file=sys.stderr)
+    print(get_string("err_import_critical"), file=sys.stderr)
+    print(get_string("err_ensure_errors"), file=sys.stderr)
     input(get_string("press_enter_to_exit"))
     sys.exit(1)
 
 def _check_platform():
     if platform.system() != "Windows":
-        print("[!] Fatal Error: This tool is designed to run only on Windows.", file=sys.stderr)
-        print(f"    Current platform detected: {platform.system()}", file=sys.stderr)
-        print("[!] Aborting.", file=sys.stderr)
+        print(get_string("err_fatal_windows"), file=sys.stderr)
+        print(get_string("err_current_platform").format(platform=platform.system()), file=sys.stderr)
+        print(get_string("err_aborting"), file=sys.stderr)
         input(get_string("press_enter_to_exit"))
         sys.exit(1)
     
     if platform.machine() != "AMD64":
-        print("[!] Fatal Error: This tool requires a 64-bit (AMD64) Windows environment.", file=sys.stderr)
-        print(f"    Current architecture detected: {platform.machine()}", file=sys.stderr)
-        print("[!] 32-bit (I386) or ARM64 builds are not supported.", file=sys.stderr)
-        print("[!] Aborting.", file=sys.stderr)
+        print(get_string("err_fatal_amd64"), file=sys.stderr)
+        print(get_string("err_current_arch").format(arch=platform.machine()), file=sys.stderr)
+        print(get_string("err_arch_unsupported"), file=sys.stderr)
+        print(get_string("err_aborting"), file=sys.stderr)
         input(get_string("press_enter_to_exit"))
         sys.exit(1)
 
@@ -43,6 +43,12 @@ def setup_console():
     try:
         import ctypes
         ctypes.windll.kernel32.SetConsoleTitleW(u"LTBox")
+
+        sys.stdout.write("\x1b[8;40;80t")
+        sys.stdout.flush()
+
+        os.system("mode con: cols=80 lines=40")
+        
     except Exception as e:
         print(get_string("warn_set_console_title").format(e=e), file=sys.stderr)
 
@@ -52,9 +58,9 @@ def check_path_encoding():
         ui.clear()
         ui.box_output([
             get_string("critical_error_path_encoding"),
-            "  " + "-" * 55,
+            "  " + "-" * 75,
             get_string("current_path").format(current_path=current_path),
-            "  " + "-" * 55,
+            "  " + "-" * 75,
             get_string("path_encoding_details_1"),
             get_string("path_encoding_details_2"),
             "",
@@ -66,55 +72,50 @@ def check_path_encoding():
         input(get_string("press_enter_to_continue"))
         raise RuntimeError(get_string("critical_error_path_encoding"))
 
-def run_task(command, title, dev, command_map):
+def run_task(command, title, dev, command_map, extra_kwargs=None):
     ui.clear()
     
-    ui.echo("  " + "=" * 58)
+    ui.echo("  " + "=" * 78)
     ui.echo(get_string("starting_task").format(title=title))
-    ui.echo("  " + "=" * 58 + "\n")
-
-    log_file = None
-    if command in ["patch_all", "patch_all_wipe"]:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = f"log_{timestamp}.txt"
-        ui.info(get_string("logging_enabled").format(log_file=log_file))
-        ui.info(get_string("logging_command").format(command=command))
+    ui.echo("  " + "=" * 78 + "\n")
 
     try:
-        with logging_context(log_file):
-            func_tuple = command_map.get(command)
-            if not func_tuple:
-                raise ToolError(get_string("unknown_command").format(command=command))
-            
-            func, base_kwargs = func_tuple
-            final_kwargs = base_kwargs.copy()
-            
-            no_dev_needed = {
-                "patch_root_image_file_gki", "patch_root_image_file_lkm", 
-                "edit_dp", 
-                "patch_anti_rollback", "clean", "modify_xml", "modify_xml_wipe",
-                "decrypt_xml"
-            }
-            
-            if command not in no_dev_needed:
-                final_kwargs["dev"] = dev
-            
-            result = func(**final_kwargs)
+        func_tuple = command_map.get(command)
+        if not func_tuple:
+            raise ToolError(get_string("unknown_command").format(command=command))
+        
+        func, base_kwargs = func_tuple
+        final_kwargs = base_kwargs.copy()
+        
+        if extra_kwargs:
+            final_kwargs.update(extra_kwargs)
+        
+        no_dev_needed = {
+            "patch_root_image_file_gki", "patch_root_image_file_lkm", 
+            "edit_dp", 
+            "patch_anti_rollback", "clean", "modify_xml", "modify_xml_wipe",
+            "decrypt_xml"
+        }
+        
+        if command not in no_dev_needed:
+            final_kwargs["dev"] = dev
 
-            ui.echo("\n" + "=" * 61)
-            ui.echo(get_string("act_success"))
-            ui.echo("=" * 61)
+        result = func(**final_kwargs)
 
-            if isinstance(result, str) and result:
-                ui.echo(result)
-            elif isinstance(result, tuple) and command == "read_anti_rollback":
-                 ui.echo(get_string("act_arb_complete").format(status=result[0]))
-                 ui.echo(get_string("act_curr_boot_idx").format(idx=result[1]))
-                 ui.echo(get_string("act_curr_vbmeta_idx").format(idx=result[2]))
-            elif command == "clean":
-                pass
-            elif result:
-                ui.echo(get_string("act_unhandled_success_result").format(res=result))
+        ui.echo("\n  " + "=" * 78)
+        ui.echo(get_string("act_success"))
+        ui.echo("  " + "=" * 78)
+
+        if isinstance(result, str) and result:
+            ui.echo(result)
+        elif isinstance(result, tuple) and command == "read_anti_rollback":
+                ui.echo(get_string("act_arb_complete").format(status=result[0]))
+                ui.echo(get_string("act_curr_boot_idx").format(idx=result[1]))
+                ui.echo(get_string("act_curr_vbmeta_idx").format(idx=result[2]))
+        elif command == "clean":
+            pass
+        elif result:
+            ui.echo(get_string("act_unhandled_success_result").format(res=result))
 
     except ToolError as e:
         ui.box_output([get_string("task_failed").format(title=title), str(e)], err=True)
@@ -134,12 +135,10 @@ def run_task(command, title, dev, command_map):
         ui.error(get_string("process_cancelled"))
     finally:
         ui.echo("")
-        if log_file:
-            ui.info(get_string("logging_finished").format(log_file=log_file))
 
-        ui.echo("  " + "=" * 58)
+        ui.echo("  " + "=" * 78)
         ui.echo(get_string("task_completed").format(title=title))
-        ui.echo("  " + "=" * 58 + "\n")
+        ui.echo("  " + "=" * 78 + "\n")
         
         if command == "clean":
             input(get_string("press_enter_to_exit"))
@@ -188,7 +187,7 @@ def run_info_scan(paths, constants, avb_patch):
                 if result.stderr:
                      logger.info(get_string("scan_log_errors").format(errors=result.stderr.strip()))
 
-                logger.info("\n" + "="*70 + "\n")
+                logger.info("\n" + "="*78 + "\n")
             except Exception as e:
                 error_msg = get_string("scan_failed").format(filename=f.name, e=e)
                 print(error_msg, file=sys.stderr)
@@ -197,42 +196,72 @@ def run_info_scan(paths, constants, avb_patch):
     print(get_string("scan_complete"))
     print(get_string("scan_saved_to").format(filename=log_filename.name))
 
-def print_main_menu(skip_adb):
+def print_main_menu(skip_adb, skip_rollback):
     skip_adb_state = "ON" if skip_adb else "OFF"
+    skip_rb_state = "ON" if skip_rollback else "OFF"
     os.system('cls')
-    print("\n  " + "=" * 58)
+    print("\n  " + "=" * 78)
     print(get_string("menu_main_title"))
-    print("  " + "=" * 58 + "\n")
+    print("  " + "=" * 78 + "\n")
+
+    print(f"  {get_string('menu_main_sub_install')}")
     print(get_string("menu_main_1"))
     print(get_string("menu_main_2"))
+    print("")
+
+    print(f"  {get_string('menu_main_sub_manage')}")
     print(get_string("menu_main_3"))
     print(get_string("menu_main_4"))
     print(get_string("menu_main_5"))
+    print("")
+
+    print(f"  {get_string('menu_main_sub_settings')}")
     print(get_string("menu_main_6").format(skip_adb_state=skip_adb_state))
-    print("\n" + get_string("menu_main_a"))
+    print(get_string("menu_main_7").format(skip_rb_state=skip_rb_state))
+    print("")
+
+    print(f"  {get_string('menu_main_sub_nav')}")
+    print(get_string("menu_main_a"))
     print(get_string("menu_main_x"))
-    print("\n  " + "=" * 58 + "\n")
+    print("\n  " + "=" * 78 + "\n")
 
 def print_advanced_menu():
     os.system('cls')
-    print("\n  " + "=" * 58)
+    print("\n  " + "=" * 78)
     print(get_string("menu_adv_title"))
-    print("  " + "=" * 58 + "\n")
+    print("  " + "=" * 78 + "\n")
+
+    print(f"  {get_string('menu_adv_sub_region_dump')}")
     print(get_string("menu_adv_1"))
     print(get_string("menu_adv_2"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_patch_region')}")
     print(get_string("menu_adv_3"))
     print(get_string("menu_adv_4"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_arb')}")
     print(get_string("menu_adv_5"))
     print(get_string("menu_adv_6"))
     print(get_string("menu_adv_7"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_xml_flash')}")
     print(get_string("menu_adv_8"))
     print(get_string("menu_adv_9"))
     print(get_string("menu_adv_10"))
     print(get_string("menu_adv_11"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_maint')}")
     print(get_string("menu_adv_12"))
-    print("\n" + get_string("menu_adv_m"))
+    print("")
+
+    print(f"  {get_string('menu_adv_sub_nav')}")
+    print(get_string("menu_adv_m"))
     print(get_string("menu_main_x"))
-    print("\n  " + "=" * 58 + "\n")
+    print("\n  " + "=" * 78 + "\n")
 
 def advanced_menu(dev, command_map):
     actions_map = {
@@ -269,14 +298,14 @@ def advanced_menu(dev, command_map):
 
 def print_root_mode_selection_menu():
     os.system('cls')
-    print("\n  " + "=" * 58)
+    print("\n  " + "=" * 78)
     print(get_string("menu_root_mode_title"))
-    print("  " + "=" * 58 + "\n")
+    print("  " + "=" * 78 + "\n")
     print(get_string("menu_root_mode_1"))
     print(get_string("menu_root_mode_2"))
     print("\n" + get_string("menu_root_m"))
     print(get_string("menu_main_x"))
-    print("\n  " + "=" * 58 + "\n")
+    print("\n  " + "=" * 78 + "\n")
 
 def root_mode_selection_menu(dev, command_map):
     while True:
@@ -297,9 +326,9 @@ def root_mode_selection_menu(dev, command_map):
 
 def print_root_menu(gki: bool):
     os.system('cls')
-    print("\n  " + "=" * 58)
+    print("\n  " + "=" * 78)
     print(get_string("menu_root_title"))
-    print("  " + "=" * 58 + "\n")
+    print("  " + "=" * 78 + "\n")
     if gki:
         print(get_string("menu_root_1_gki"))
         print(get_string("menu_root_2_gki"))
@@ -308,7 +337,7 @@ def print_root_menu(gki: bool):
         print(get_string("menu_root_2_lkm"))
     print("\n" + get_string("menu_root_m"))
     print(get_string("menu_main_x"))
-    print("\n  " + "=" * 58 + "\n")
+    print("\n  " + "=" * 78 + "\n")
 
 def root_menu(dev, command_map, gki: bool):
     if gki:
@@ -339,6 +368,7 @@ def root_menu(dev, command_map, gki: bool):
 
 def main_loop(device_controller_class, command_map):
     skip_adb = False
+    skip_rollback = False
     dev = device_controller_class(skip_adb=skip_adb)
     
     actions_map = {
@@ -349,17 +379,22 @@ def main_loop(device_controller_class, command_map):
     }
 
     while True:
-        print_main_menu(skip_adb)
+        print_main_menu(skip_adb, skip_rollback)
         choice = input(get_string("menu_main_prompt")).strip().lower()
 
         if choice in actions_map:
             cmd, title = actions_map[choice]
-            run_task(cmd, title, dev, command_map)
+            extras = {}
+            if cmd in ["patch_all", "patch_all_wipe"]:
+                extras["skip_rollback"] = skip_rollback
+            run_task(cmd, title, dev, command_map, extra_kwargs=extras)
         elif choice == "4":
             root_mode_selection_menu(dev, command_map)
         elif choice == "6":
             skip_adb = not skip_adb
             dev.skip_adb = skip_adb
+        elif choice == "7":
+            skip_rollback = not skip_rollback
         elif choice == "a":
             advanced_menu(dev, command_map)
         elif choice == "x":
@@ -394,11 +429,11 @@ def prompt_for_language() -> str:
         menu_options.append(f"     {i}. {lang_name}")
 
     os.system('cls')
-    print("\n  " + "=" * 58)
+    print("\n  " + "=" * 78)
     print(get_string("menu_lang_title"))
-    print("  " + "=" * 58 + "\n")
+    print("  " + "=" * 78 + "\n")
     print("\n".join(menu_options))
-    print("\n  " + "=" * 58 + "\n")
+    print("\n  " + "=" * 78 + "\n")
 
     choice = ""
     while choice not in lang_map:
